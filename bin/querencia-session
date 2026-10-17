@@ -1,0 +1,352 @@
+#!/bin/sh
+# Querencia Desktop session starter, installed as /usr/bin/querencia-session.
+#
+# Runs labwc with the Querencia configuration. labwc starts the desktop
+# (background and icons) and the panel through its autostart file once the
+# Wayland socket exists.
+#
+#   querencia-session          start the session (display manager or console login)
+#   querencia-session --exit   end the running Querencia session (also from SSH)
+#   querencia-session --check  show what would be started and check it; starts nothing
+#   querencia-session --version
+#
+# Portable successor of the development starter (herkunft/session/): no
+# fixed home or project paths, labwc from PATH, configuration from
+# /etc/querencia or the user's ~/.config/querencia. The checks against
+# double starts and the clean-up after labwc are unchanged.
+#
+# Optional settings (KEY=VALUE, first match wins, never sourced as shell):
+#   ~/.config/querencia/session.conf, then /etc/querencia/session.conf
+#     LABWC=/path/to/labwc          labwc binary (default: labwc in PATH)
+#     PANEL=/path/to/querencia-panel
+#     DESKTOP=/path/to/querencia-desktop   or DESKTOP=none (no desktop)
+
+set -u
+
+PROGRAM=querencia-session
+VERSION=0.1.0~alpha1
+# labwc 0.9.3 (Ubuntu 26.04) gives open panel menus no keyboard focus; see
+# docs/TROUBLESHOOTING.md in the querencia repository.
+LABWC_MIN=0.9.4
+
+# Overridable for tests only; packages install to these places.
+SYSCONFDIR=${QUERENCIA_SYSCONFDIR:-/etc}
+BINDIR=${QUERENCIA_BINDIR:-/usr/bin}
+
+CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+STATE_DIR=${XDG_STATE_HOME:-$HOME/.local/state}/querencia
+
+die() {
+    echo "$PROGRAM: $*" >&2
+    exit 1
+}
+
+# --- settings -----------------------------------------------------------
+
+conf_labwc= conf_panel= conf_desktop=
+conf_seen_labwc= conf_seen_panel= conf_seen_desktop=
+
+# Reads KEY=VALUE lines of file $1. Earlier files win, so the user's file is
+# read first. Values are taken literally (no shell expansion).
+read_conf() {
+    [ -r "$1" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        case $line in
+        '' | '#'*) continue ;;
+        *=*) ;;
+        *)
+            echo "$PROGRAM: $1: Zeile ohne '=' ignoriert: $line" >&2
+            continue
+            ;;
+        esac
+        key=${line%%=*} value=${line#*=}
+        case $key in
+        LABWC) [ -n "$conf_seen_labwc" ] || { conf_labwc=$value conf_seen_labwc=1; } ;;
+        PANEL) [ -n "$conf_seen_panel" ] || { conf_panel=$value conf_seen_panel=1; } ;;
+        DESKTOP) [ -n "$conf_seen_desktop" ] || { conf_desktop=$value conf_seen_desktop=1; } ;;
+        *) echo "$PROGRAM: $1: unbekannter Eintrag ignoriert: $key" >&2 ;;
+        esac
+    done <"$1"
+}
+read_conf "$CONFIG_HOME/querencia/session.conf"
+read_conf "$SYSCONFDIR/querencia/session.conf"
+
+LABWC=${conf_labwc:-$(command -v labwc 2>/dev/null || true)}
+PANEL=${conf_panel:-$BINDIR/querencia-panel}
+case ${conf_desktop:-} in
+none) DESKTOP= ;;
+'') DESKTOP=$BINDIR/querencia-desktop
+    [ -x "$DESKTOP" ] || DESKTOP= ;;
+*) DESKTOP=$conf_desktop ;;
+esac
+
+# A complete user configuration replaces the system one as a whole (labwc
+# reads exactly one directory with -C).
+if [ -r "$CONFIG_HOME/querencia/labwc/autostart" ] &&
+    [ -r "$CONFIG_HOME/querencia/labwc/environment" ]; then
+    CONFIG_DIR=$CONFIG_HOME/querencia/labwc
+else
+    CONFIG_DIR=$SYSCONFDIR/querencia/labwc
+fi
+
+# --- helpers ------------------------------------------------------------
+
+# Succeeds if dotted version $1 is at least $2 (numeric parts; a suffix
+# such as "-dev" after a part is ignored).
+version_at_least() {
+    have=$1 need=$2
+    while [ -n "$need" ]; do
+        h=${have%%.*} n=${need%%.*}
+        h=$(expr "x$h" : 'x\([0-9]*\)') n=$(expr "x$n" : 'x\([0-9]*\)')
+        h=${h:-0} n=${n:-0}
+        [ "$h" -gt "$n" ] && return 0
+        [ "$h" -lt "$n" ] && return 1
+        case $have in *.*) have=${have#*.} ;; *) have= ;; esac
+        case $need in *.*) need=${need#*.} ;; *) need= ;; esac
+    done
+    return 0
+}
+
+labwc_version() {
+    "$LABWC" --version 2>/dev/null | sed -n '1s/^labwc \([^ ]*\).*/\1/p'
+}
+
+# Checks everything that does not need a session; prints one line per item.
+# Returns 1 if anything needed is missing.
+static_checks() {
+    ok=0
+    if [ -z "$LABWC" ]; then
+        echo "labwc:       FEHLT (nicht in PATH, kein LABWC= in session.conf)"
+        ok=1
+    elif [ ! -x "$LABWC" ]; then
+        echo "labwc:       FEHLT ($LABWC nicht ausführbar)"
+        ok=1
+    else
+        version=$(labwc_version)
+        if [ -n "$version" ] && version_at_least "$version" "$LABWC_MIN"; then
+            echo "labwc:       $LABWC ($version)"
+        else
+            echo "labwc:       ZU ALT: $LABWC (${version:-unbekannt}, nötig $LABWC_MIN oder neuer)"
+            ok=1
+        fi
+    fi
+    for file in environment autostart; do
+        if [ ! -r "$CONFIG_DIR/$file" ]; then
+            echo "Konfiguration: FEHLT $CONFIG_DIR/$file"
+            ok=1
+        fi
+    done
+    echo "Konfiguration: $CONFIG_DIR"
+    if [ -x "$PANEL" ]; then
+        echo "Panel:       $PANEL"
+    else
+        echo "Panel:       FEHLT ($PANEL)"
+        ok=1
+    fi
+    echo "Arbeitsfläche: ${DESKTOP:-(keine)}"
+    echo "Zustand:     $STATE_DIR"
+    return $ok
+}
+
+# The start time (field 22 of /proc/PID/stat, clock ticks since boot) tells
+# a reused PID apart; the same parsing is in labwc/autostart.
+starttime() {
+    stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+    set -- ${stat##*) }
+    [ -n "${20-}" ] && echo "${20}"
+}
+
+# The boot ID ties labwc records to this boot: the start time counts from
+# boot, so after a reboot an old record could otherwise fit a new process.
+boot_id=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+case $boot_id in
+'' | *[!0-9a-f-]*) boot_id= ;;
+esac
+
+# The exact argument list the starter gives labwc, one argument per line.
+labwc_argv=$(printf '%s\n' "$LABWC" -C "$CONFIG_DIR")
+
+# labwc record, one line: "q2 BOOTID PID STARTTIME".
+labwc_record_for() {
+    start=$(starttime "$1") || return 1
+    echo "q2 $boot_id $1 $start"
+}
+
+# Succeeds while labwc record $1 still describes the very labwc this starter
+# runs: same boot, same user, exactly the arguments
+# "LABWC -C CONFIG_DIR" (NUL-separated /proc/PID/cmdline, no further
+# arguments, no newline inside an argument) and the same start time. The
+# start time is compared last, so a PID reused during the other checks is
+# caught as well. Anything else, including malformed records, is rejected.
+labwc_matches() {
+    [ -n "$boot_id" ] || return 1
+    case $1 in '' | *[!0-9a-fq\ -]*) return 1 ;; esac
+    set -- $1
+    [ $# -eq 4 ] && [ "$1" = q2 ] && [ "$2" = "$boot_id" ] || return 1
+    pid=$3 start=$4
+    case $pid in '' | *[!0-9]*) return 1 ;; esac
+    case $start in '' | *[!0-9]*) return 1 ;; esac
+    [ "$(ps -o uid= -p "$pid" | tr -d ' ')" = "$(id -u)" ] || return 1
+    cmdline=/proc/$pid/cmdline
+    [ "$(tr -cd '\000' <"$cmdline" 2>/dev/null | wc -c)" -eq 3 ] || return 1
+    [ "$(tr -cd '\n' <"$cmdline" 2>/dev/null | wc -c)" -eq 0 ] || return 1
+    [ "$(tr '\000' '\n' <"$cmdline" 2>/dev/null)" = "$labwc_argv" ] || return 1
+    [ "$(starttime "$pid")" = "$start" ]
+}
+
+# Panel and desktop records hold "PID STARTTIME" (written by autostart).
+# Succeeds while record $1 still describes the very same process of this
+# user running program $2.
+matches() {
+    pid=${1%% *} start=${1#* }
+    case $pid in '' | *[!0-9]*) return 1 ;; esac
+    case $start in '' | *[!0-9]*) return 1 ;; esac
+    [ "$(ps -o uid= -p "$pid" | tr -d ' ')" = "$(id -u)" ] || return 1
+    [ "$(ps -o args= -p "$pid" | cut -d' ' -f1)" = "$2" ] || return 1
+    [ "$(starttime "$pid")" = "$start" ]
+}
+
+# Removes PID file $1 only while it still holds record $2.
+remove_record() {
+    if [ "$(cat "$1" 2>/dev/null)" = "$2" ]; then
+        rm -f "$1"
+    fi
+}
+
+# Succeeds if a process of this user runs program $1, judged by the first
+# word of its command line (with or without a path).
+running() {
+    pgrep -u "$(id -u)" -f "^([^ ]*/)?$1( |\$)" >/dev/null
+}
+
+# Value of KEY=VALUE line $2 in file $1 (quotes removed), as in
+# /etc/default/keyboard and /etc/default/locale.
+default_value() {
+    sed -n "s/^[[:space:]]*$2=//p" "$1" 2>/dev/null | tail -n 1 |
+        sed 's/^"\(.*\)"$/\1/; s/^'"'"'\(.*\)'"'"'$/\1/'
+}
+
+# --- options ------------------------------------------------------------
+
+case ${1-} in
+--version)
+    echo "$PROGRAM $VERSION"
+    exit 0
+    ;;
+--check)
+    static_checks
+    exit $?
+    ;;
+--exit)
+    record=$(cat "$STATE_DIR/labwc.pid" 2>/dev/null)
+    labwc_matches "$record" ||
+        die "keine laufende Querencia-Sitzung gefunden ($STATE_DIR/labwc.pid)"
+    # labwc_matches set pid to the checked labwc.
+    kill -TERM "$pid" || die "labwc ($pid) konnte nicht beendet werden"
+    echo "$PROGRAM: labwc ($pid) wird beendet"
+    exit 0
+    ;;
+'') ;;
+*) die "unbekannte Option: $1 (erlaubt: --check, --exit, --version)" ;;
+esac
+
+# --- start --------------------------------------------------------------
+
+# One graphical session per user: the systemd user manager, the D-Bus
+# activation environment and the D-Bus session bus are shared per user.
+[ -z "${WAYLAND_DISPLAY-}" ] ||
+    die "läuft bereits in einer Wayland-Sitzung (WAYLAND_DISPLAY=$WAYLAND_DISPLAY)"
+[ -n "${XDG_RUNTIME_DIR-}" ] || die "XDG_RUNTIME_DIR fehlt"
+[ -n "${XDG_SESSION_ID-}" ] || die "keine logind-Sitzung (XDG_SESSION_ID fehlt)"
+seat=$(loginctl show-session "$XDG_SESSION_ID" -p Seat --value 2>/dev/null)
+[ -n "$seat" ] ||
+    die "logind-Sitzung $XDG_SESSION_ID hat keinen Sitz; nur an einer lokalen Konsole oder über einen Anmeldebildschirm starten"
+for program in labwc querencia-panel querencia-desktop; do
+    if running "$program"; then
+        die "es läuft bereits ein $program dieses Benutzers (andere Sitzung aktiv?)"
+    fi
+done
+
+report=$(static_checks) || {
+    echo "$report" >&2
+    die "Sitzung wird nicht gestartet (siehe oben; Diagnose: $PROGRAM --check)"
+}
+[ -n "$boot_id" ] || die "Boot-ID nicht lesbar: /proc/sys/kernel/random/boot_id"
+
+# labwc only updates the D-Bus/systemd activation environment when it knows
+# the session bus.
+if [ -z "${DBUS_SESSION_BUS_ADDRESS-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+fi
+
+# Keyboard and language of the system unless the login already set them
+# (labwc's environment file can still override both).
+if [ -z "${XKB_DEFAULT_LAYOUT-}" ] && [ -r /etc/default/keyboard ]; then
+    for pair in LAYOUT:XKBLAYOUT VARIANT:XKBVARIANT MODEL:XKBMODEL OPTIONS:XKBOPTIONS; do
+        value=$(default_value /etc/default/keyboard "${pair#*:}")
+        [ -z "$value" ] || export "XKB_DEFAULT_${pair%%:*}=$value"
+    done
+fi
+if [ -z "${LANG-}" ] && [ -r /etc/default/locale ]; then
+    for key in LANG LANGUAGE; do
+        value=$(default_value /etc/default/locale "$key")
+        [ -z "$value" ] || export "$key=$value"
+    done
+fi
+
+mkdir -p "$STATE_DIR" || die "kann $STATE_DIR nicht anlegen"
+for log in labwc panel desktop; do
+    if [ -f "$STATE_DIR/$log.log" ]; then
+        mv -f "$STATE_DIR/$log.log" "$STATE_DIR/$log.log.1"
+    fi
+done
+# No labwc, panel or desktop of this user runs (checked above), so older
+# records are stale.
+rm -f "$STATE_DIR/labwc.pid" "$STATE_DIR"/panel.*.pid "$STATE_DIR"/desktop.*.pid
+panel_file=$STATE_DIR/panel.$$.pid
+desktop_file=$STATE_DIR/desktop.$$.pid
+
+# Read by the autostart file (QUERENCIA_DESKTOP empty: no desktop).
+export QUERENCIA_PANEL="$PANEL" QUERENCIA_STATE_DIR="$STATE_DIR" \
+    QUERENCIA_PANEL_RECORD="$panel_file" \
+    QUERENCIA_DESKTOP="$DESKTOP" QUERENCIA_DESKTOP_RECORD="$desktop_file"
+echo "$PROGRAM: Panel $PANEL, Arbeitsfläche ${DESKTOP:-(keine)}, Konfiguration $CONFIG_DIR"
+
+cd "$HOME" || die "kann nicht nach $HOME wechseln"
+echo "$PROGRAM: starte $LABWC ($(labwc_version)), Log $STATE_DIR/labwc.log"
+"$LABWC" -C "$CONFIG_DIR" </dev/null >>"$STATE_DIR/labwc.log" 2>&1 &
+labwc_pid=$!
+labwc_record=$(labwc_record_for "$labwc_pid")
+echo "$labwc_record" >"$STATE_DIR/labwc.pid"
+
+# Forward termination to labwc so that it runs its normal shutdown and
+# clears the activation environment. wait returns early on a trapped
+# signal, so keep waiting until labwc itself has exited.
+trap 'kill -TERM "$labwc_pid" 2>/dev/null' HUP INT TERM
+while :; do
+    wait "$labwc_pid"
+    status=$?
+    kill -0 "$labwc_pid" 2>/dev/null || break
+done
+trap ':' HUP INT TERM
+remove_record "$STATE_DIR/labwc.pid" "$labwc_record"
+
+# GTK ends the panel and the desktop when the Wayland connection is lost.
+# Give them a moment, then end a program of this session only if that very
+# process is still left over.
+leftover() {
+    record=$(cat "$1" 2>/dev/null)
+    if [ -n "$2" ] && matches "$record" "$2"; then
+        sleep 2
+        if matches "$record" "$2"; then
+            echo "$PROGRAM: $3 (${record%% *}) läuft nach labwc weiter, sende SIGTERM" >&2
+            kill -TERM "${record%% *}"
+        fi
+    fi
+    rm -f "$1"
+}
+leftover "$panel_file" "$PANEL" Panel
+leftover "$desktop_file" "$DESKTOP" Arbeitsfläche
+
+echo "$PROGRAM: labwc beendet mit Status $status, Logs in $STATE_DIR"
+exit "$status"

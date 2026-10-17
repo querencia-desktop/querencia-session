@@ -1,0 +1,4 @@
+# Testläufe legen nur Wegwerfordner unter $TMPDIR an.
+*.swp
+*~
+/debian/

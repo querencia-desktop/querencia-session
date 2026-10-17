@@ -1,0 +1,6 @@
+# Default applications of the Querencia session only (XDG_CURRENT_DESKTOP
+# X-Querencia, mime-apps-spec "$desktop-mimeapps.list"). Other desktops
+# (GNOME, KDE, …) are not affected; the user's ~/.config/mimeapps.list
+# always wins.
+[Default Applications]
+inode/directory=io.github.lgse.Strata.desktop

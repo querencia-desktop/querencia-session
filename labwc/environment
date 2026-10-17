@@ -1,0 +1,17 @@
+# Querencia Desktop session environment, read by labwc before anything else
+# (labwc -C, see querencia-session). Values override the login environment,
+# e.g. XDG_SESSION_TYPE=tty from a console login.
+#
+# labwc also exports XDG_CURRENT_DESKTOP and XDG_SESSION_TYPE (with
+# WAYLAND_DISPLAY, DISPLAY and LABWC_PID) to the D-Bus and systemd
+# activation environment and clears them again on a normal exit.
+#
+# Language and keyboard are deliberately not set here: querencia-session
+# takes them from the login, else from /etc/default/locale and
+# /etc/default/keyboard. To force them for this session only, add e.g.
+#   LANG=de_DE.UTF-8
+#   XKB_DEFAULT_LAYOUT=de
+# to a copy of this directory in ~/.config/querencia/labwc/.
+XDG_SESSION_TYPE=wayland
+XDG_CURRENT_DESKTOP=X-Querencia
+XDG_SESSION_DESKTOP=querencia

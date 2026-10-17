@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Querencia Desktop
+Comment=Classic desktop in the style of GNOME 2 (labwc)
+Comment[de]=Klassischer Desktop im Stil von GNOME 2 (labwc)
+Exec=/usr/bin/querencia-session
+TryExec=/usr/bin/querencia-session
+DesktopNames=X-Querencia

@@ -1,0 +1,9 @@
+# Beispiel für /etc/greetd/config.toml – NICHT automatisch installiert.
+# Textbasierter Greeter aus Ubuntu (Paket tuigreet); bietet alle
+# Wayland-Sitzungen an, darunter „Querencia Desktop“.
+[terminal]
+vt = 7
+
+[default_session]
+command = "tuigreet --time --remember-session --sessions /usr/share/wayland-sessions"
+user = "_greetd"

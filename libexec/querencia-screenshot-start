@@ -1,0 +1,41 @@
+#!/bin/sh
+# Starts Querencia Screenshot for the Print key (/etc/querencia/labwc/rc.xml).
+#
+# The application is a unique GApplication (org.querencia.Screenshot): if it
+# already runs, starting it again only raises its window over D-Bus, so this
+# launcher never starts a competing instance and never ends one.
+#
+# labwc runs this without a shell and with its own environment (Wayland
+# socket, D-Bus address, XDG variables); exec passes it on unchanged.
+
+set -u
+
+# Installed by the querencia-screenshot package; QUERENCIA_SCREENSHOT is for
+# tests only. Never whatever else is found in PATH.
+SCREENSHOT=${QUERENCIA_SCREENSHOT:-/usr/bin/querencia-screenshot}
+
+# Errors go to stderr, which is labwc's log ($QUERENCIA_STATE_DIR/labwc.log),
+# and, if a notification service answers, to the screen.
+fail() {
+    echo "querencia-screenshot-start: $*" >&2
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send --app-name="Querencia Screenshot" \
+            "Querencia Screenshot nicht gestartet" "$*" >/dev/null 2>&1 &
+    fi
+    exit 1
+}
+
+[ -n "${WAYLAND_DISPLAY-}" ] || fail "keine Wayland-Sitzung (WAYLAND_DISPLAY leer)"
+[ -f "$SCREENSHOT" ] || fail "Programm nicht installiert: $SCREENSHOT (Paket querencia-screenshot)"
+[ -x "$SCREENSHOT" ] || fail "Programm nicht ausführbar: $SCREENSHOT"
+
+# Independent of labwc's working directory.
+cd "$HOME" 2>/dev/null || cd /
+
+# Output into the session's state directory next to the panel log, if the
+# session starter provided one; otherwise it stays with labwc's log.
+if [ -n "${QUERENCIA_STATE_DIR-}" ] && [ -d "$QUERENCIA_STATE_DIR" ] &&
+    [ -w "$QUERENCIA_STATE_DIR" ]; then
+    exec "$SCREENSHOT" </dev/null >>"$QUERENCIA_STATE_DIR/screenshot.log" 2>&1
+fi
+exec "$SCREENSHOT" </dev/null

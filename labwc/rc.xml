@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Querencia Desktop labwc configuration (labwc -C, see querencia-session).
+  Installed as /etc/querencia/labwc/rc.xml (a conffile: local changes are
+  kept on upgrades). Per user: copy /etc/querencia/labwc/ to
+  ~/.config/querencia/labwc/ and edit the copy.
+
+  Only what Querencia changes is listed; everything else keeps labwc's
+  built-in defaults. labwc drops its default keybinds as soon as rc.xml has
+  one <keybind> of its own, so <default /> loads them again first
+  (labwc-config(5), "<keyboard><default />"). Without a <mouse> section
+  labwc keeps its default mouse bindings.
+
+  Execute runs the command without a shell, so the launcher is named by its
+  absolute path.
+-->
+<labwc_config>
+  <!-- Four workspaces like GNOME 2. popupTime="0": no labwc overlay, the
+       panel's workspace switcher shows the change. -->
+  <desktops number="4" popupTime="0" prefix="Arbeitsfläche" />
+
+  <keyboard>
+    <default />
+    <!-- Print (Druck): open Querencia Screenshot, which offers rectangle,
+         window and screen capture itself. -->
+    <keybind key="Print">
+      <action name="Execute" command="/usr/libexec/querencia/querencia-screenshot-start" />
+    </keybind>
+    <!-- GNOME 2 (Metacity) workspace keys: Ctrl+Alt+Left/Right switches,
+         with Shift the active window moves along. No wrap-around, like
+         Metacity and the panel switcher. -->
+    <keybind key="C-A-Left">
+      <action name="GoToDesktop" to="left" wrap="no" />
+    </keybind>
+    <keybind key="C-A-Right">
+      <action name="GoToDesktop" to="right" wrap="no" />
+    </keybind>
+    <keybind key="C-A-S-Left">
+      <action name="SendToDesktop" to="left" follow="yes" wrap="no" />
+    </keybind>
+    <keybind key="C-A-S-Right">
+      <action name="SendToDesktop" to="right" follow="yes" wrap="no" />
+    </keybind>
+  </keyboard>
+</labwc_config>
