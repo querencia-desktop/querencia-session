@@ -21,10 +21,15 @@
 
   <keyboard>
     <default />
-    <!-- Print (Druck): open Querencia Screenshot, which offers rectangle,
-         window and screen capture itself. -->
+    <!-- Print (Druck) opens the Querencia Screenshot chooser (screen,
+         frame a window, select an area), Alt+Print starts the window
+         capture directly (the window is framed with the mouse). Both open
+         the editor afterwards. -->
     <keybind key="Print">
       <action name="Execute" command="/usr/libexec/querencia/querencia-screenshot-start" />
+    </keybind>
+    <keybind key="A-Print">
+      <action name="Execute" command="/usr/libexec/querencia/querencia-screenshot-start --window" />
     </keybind>
     <!-- GNOME 2 (Metacity) workspace keys: Ctrl+Alt+Left/Right switches,
          with Shift the active window moves along. No wrap-around, like
@@ -41,5 +46,59 @@
     <keybind key="C-A-S-Right">
       <action name="SendToDesktop" to="right" follow="yes" wrap="no" />
     </keybind>
+    <!-- Querencia Sitzung (package querencia-sitzung): Ctrl+Alt+L locks the
+         screen at once (ext-session-lock, as GNOME 2), Ctrl+Alt+Delete
+         opens the session dialog (Abmelden, Bildschirm sperren, Neu
+         starten, Herunterfahren). Without the package nothing happens. -->
+    <keybind key="C-A-l">
+      <action name="Execute" command="/usr/bin/querencia-sitzung --sperren --sofort" />
+    </keybind>
+    <keybind key="C-A-Delete">
+      <action name="Execute" command="/usr/bin/querencia-sitzung --dialog" />
+    </keybind>
+    <!-- Querencia Tastenkürzel (package querencia-shell): Super+? (Super+
+         Umschalt+ß on the German keyboard; labwc compares the modifiers
+         exactly, hence W-S-) shows all shortcuts. -->
+    <keybind key="W-S-question">
+      <action name="Execute" command="/usr/bin/querencia-kuerzel" />
+    </keybind>
   </keyboard>
+
+  <!-- Querencia Sitzung and its polkit agent: their dialogs open centred
+       on the active output and stay out of the window list and Alt+Tab,
+       like GNOME 2 dialogs. -->
+  <windowRules>
+    <windowRule identifier="org.querencia.Sitzung*" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="AutoPlace" policy="center" />
+    </windowRule>
+    <windowRule identifier="org.querencia.PolkitAgent*" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="AutoPlace" policy="center" />
+    </windowRule>
+  </windowRules>
+
+  <!-- Alt+Tab: list ("classic") with icon, title and workspace, only on
+       the output with the keyboard focus. Colours and sizes come from the
+       theme Querencia-Klassisch (osd.*). As with Metacity only the windows
+       of the current workspace are switched. -->
+  <windowSwitcher preview="yes" outlines="yes" order="focus">
+    <osd show="yes" style="classic" output="focused" />
+    <fields>
+      <field content="icon" width="6%" />
+      <field content="title" width="70%" />
+      <field content="workspace" width="24%" />
+    </fields>
+  </windowSwitcher>
+
+  <!-- Window theme Querencia-Klassisch (package querencia-shell,
+       /usr/share/themes/Querencia-Klassisch/labwc); icon theme gnome-human
+       (PNG icons as in GNOME 2; package gnome-human-icon-theme, recommended).
+       Without the theme labwc falls back to its built-in one. -->
+  <theme>
+    <name>Querencia-Klassisch</name>
+    <icon>gnome-human</icon>
+    <font place="OnScreenDisplay">
+      <name>Adwaita Sans</name>
+      <size>11</size>
+    </font>
+  </theme>
 </labwc_config>

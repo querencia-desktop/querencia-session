@@ -1,8 +1,25 @@
 # Querencia autostart, run by labwc with sh after the Wayland socket exists.
-# QUERENCIA_* come from querencia-session.
+# QUERENCIA_* come from querencia-session; optional programs are empty
+# when their package is not installed.
 : "${QUERENCIA_PANEL:?nur über querencia-session starten}"
 : "${QUERENCIA_STATE_DIR:?nur über querencia-session starten}"
 : "${QUERENCIA_PANEL_RECORD:?nur über querencia-session starten}"
+
+# The polkit agent first: polkit requests of the session (reboot, power
+# off, package installation …) get a password dialog instead of failing
+# with "no agent". Ends with labwc.
+if [ -n "${QUERENCIA_POLKIT_AGENT-}" ] && [ -x "$QUERENCIA_POLKIT_AGENT" ]; then
+    "$QUERENCIA_POLKIT_AGENT" </dev/null >>"$QUERENCIA_STATE_DIR/polkit-agent.log" 2>&1 &
+fi
+
+# Display layout saved by Querencia Einstellungen
+# (~/.config/querencia/bildschirm.ini), set before the desktop and the panel
+# create their surfaces. Synchronous (the program gives up after 5 s);
+# without the file or on error labwc's own layout stays.
+if [ -n "${QUERENCIA_EINSTELLUNGEN-}" ] && [ -x "$QUERENCIA_EINSTELLUNGEN" ]; then
+    "$QUERENCIA_EINSTELLUNGEN" --bildschirm-anwenden \
+        </dev/null >>"$QUERENCIA_STATE_DIR/bildschirm.log" 2>&1 || true
+fi
 
 # The desktop (background, icons, desktop menu; optional) first, so the
 # panel appears over a finished desktop, as on GNOME 2.
@@ -22,4 +39,16 @@ pid=$!
 if stat=$(cat "/proc/$pid/stat" 2>/dev/null); then
     set -- ${stat##*) }
     echo "$pid ${20}" >"$QUERENCIA_PANEL_RECORD"
+fi
+
+# Notification service (org.freedesktop.Notifications). If another service
+# already owns the name, it ends itself with a message in its log.
+if [ -n "${QUERENCIA_BENACHRICHTIGUNGEN-}" ] && [ -x "$QUERENCIA_BENACHRICHTIGUNGEN" ]; then
+    "$QUERENCIA_BENACHRICHTIGUNGEN" </dev/null >>"$QUERENCIA_STATE_DIR/benachrichtigungen.log" 2>&1 &
+fi
+
+# Idle lock of Querencia Sitzung. Ends with labwc (Wayland connection closes).
+if [ -n "${QUERENCIA_SITZUNG-}" ] && [ -x "$QUERENCIA_SITZUNG" ]; then
+    "$QUERENCIA_SITZUNG" --leerlauf "${QUERENCIA_LEERLAUF_MINUTEN:-10}" \
+        </dev/null >>"$QUERENCIA_STATE_DIR/sitzung.log" 2>&1 &
 fi

@@ -41,7 +41,7 @@ done
 
 # 2 version
 out=$(run sh "$S" --version)
-[ "$out" = "querencia-session 0.1.0~alpha1" ] && ok "--version" || nok "--version" "$out"
+[ "$out" = "querencia-session 0.1.0~alpha2" ] && ok "--version" || nok "--version" "$out"
 
 # 3 --check finds labwc, configuration, panel and desktop
 out=$(run sh "$S" --check); rc=$?
@@ -49,6 +49,38 @@ case $rc:$out in
 0:*"labwc:       $T/bin/labwc (0.9.8)"*"Konfiguration: $T/etc/querencia/labwc"*"Panel:       $T/bin/querencia-panel"*"Arbeitsfläche: $T/bin/querencia-desktop"*) ok "--check vollständig" ;;
 *) nok "--check vollständig" "rc=$rc $out" ;;
 esac
+
+# 3a optional programs: reported as missing, then found in BINDIR
+case $out in *"Sitzung:     (nicht installiert"*"polkit-Agent: (nicht installiert)"*"Benachrichtigungen: (nicht installiert)"*"Einstellungen: (nicht installiert)"*) ok "--check ohne optionale Programme" ;;
+*) nok "--check ohne optionale Programme" "$out" ;; esac
+for p in querencia-sitzung querencia-polkit-agent querencia-benachrichtigungen querencia-einstellungen; do
+    printf '#!/bin/sh\nexit 0\n' >"$T/bin/$p"; chmod 755 "$T/bin/$p"
+done
+out=$(run sh "$S" --check); rc=$?
+case $rc:$out in 0:*"Sitzung:     $T/bin/querencia-sitzung"*"polkit-Agent: $T/bin/querencia-polkit-agent"*"Benachrichtigungen: $T/bin/querencia-benachrichtigungen"*"Einstellungen: $T/bin/querencia-einstellungen"*) ok "--check mit optionalen Programmen" ;;
+*) nok "--check mit optionalen Programmen" "rc=$rc $out" ;; esac
+
+# 3b autostart starts exactly what the starter passes (fake programs record
+# their arguments; nothing of a real session is touched)
+A=$T/autostart; mkdir -p "$A/state"
+for p in panel desktop sitzung polkit benach einst; do
+    printf '#!/bin/sh\necho "%s $*" >>"$FAKE/autostart.txt"\n' "$p" >"$A/$p"; chmod 755 "$A/$p"
+done
+run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
+    QUERENCIA_DESKTOP="$A/desktop" QUERENCIA_DESKTOP_RECORD="$A/state/desktop.pid" \
+    QUERENCIA_SITZUNG="$A/sitzung" QUERENCIA_LEERLAUF_MINUTEN=7 QUERENCIA_POLKIT_AGENT="$A/polkit" \
+    QUERENCIA_BENACHRICHTIGUNGEN="$A/benach" QUERENCIA_EINSTELLUNGEN="$A/einst" sh "$ROOT/labwc/autostart"
+sleep 0.5
+got=$(sort "$T/autostart.txt" 2>/dev/null | tr '\n' '|')
+[ "$got" = "benach |desktop |einst --bildschirm-anwenden|panel |polkit |sitzung --leerlauf 7|" ] && ok "autostart startet alle sechs" || nok "autostart startet alle sechs" "$got"
+[ -s "$A/state/panel.pid" ] && [ -s "$A/state/desktop.pid" ] && ok "autostart schreibt Panel- und Desktop-Eintrag" || nok "autostart Einträge"
+rm -f "$T/autostart.txt"
+run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
+    QUERENCIA_DESKTOP= QUERENCIA_SITZUNG= QUERENCIA_POLKIT_AGENT= QUERENCIA_BENACHRICHTIGUNGEN= QUERENCIA_EINSTELLUNGEN= sh "$ROOT/labwc/autostart"
+sleep 0.5
+got=$(cat "$T/autostart.txt" 2>/dev/null | tr '\n' '|')
+[ "$got" = "panel |" ] && ok "autostart ohne optionale Programme: nur Panel" || nok "autostart ohne optionale Programme" "$got"
+rm -f "$T/bin/querencia-sitzung" "$T/bin/querencia-polkit-agent" "$T/bin/querencia-benachrichtigungen" "$T/bin/querencia-einstellungen"
 
 # 4 labwc versions
 for v in 0.9.4:0 0.9.8:0 0.9.10:0 0.10.0:0 1.0:0 0.9.4-dev:0 0.9.3:1 0.8.4:1 0.9:1; do
@@ -108,6 +140,11 @@ case $rc:$out in 1:*"keine laufende Querencia-Sitzung"*) ok "--exit ohne Sitzung
 # 9 configuration files
 if python3 -c "import sys, xml.dom.minidom as m; m.parse(sys.argv[1])" "$ROOT/labwc/rc.xml" 2>/dev/null; then ok "rc.xml wohlgeformt"; else nok "rc.xml wohlgeformt"; fi
 grep -q 'command="/usr/libexec/querencia/querencia-screenshot-start"' "$ROOT/labwc/rc.xml" && ok "Druck-Taste -> libexec" || nok "Druck-Taste"
+grep -q 'command="/usr/libexec/querencia/querencia-screenshot-start --window"' "$ROOT/labwc/rc.xml" && ok "Alt+Druck -> --window" || nok "Alt+Druck"
+for c in "/usr/bin/querencia-sitzung --sperren --sofort" "/usr/bin/querencia-sitzung --dialog" "/usr/bin/querencia-kuerzel"; do
+    grep -q "command=\"$c\"" "$ROOT/labwc/rc.xml" && ok "rc.xml: $c" || nok "rc.xml: $c"
+done
+grep -q '<name>Querencia-Klassisch</name>' "$ROOT/labwc/rc.xml" && ok "rc.xml: Theme Querencia-Klassisch" || nok "rc.xml: Theme"
 if command -v desktop-file-validate >/dev/null; then
     out=$(desktop-file-validate "$ROOT/share/wayland-sessions/querencia.desktop" 2>&1 | grep -v 'key "DesktopNames"')
     [ -z "$out" ] && ok "Sitzungsdatei gültig (DesktopNames wie bei GDM üblich)" || nok "Sitzungsdatei" "$out"
@@ -139,6 +176,11 @@ sleep 0.2; [ -s "$T/notified" ] && ok "Druck ohne Programm: Benachrichtigung" ||
 mkdir -p "$T/state"
 run WAYLAND_DISPLAY=x QUERENCIA_SCREENSHOT="$T/bin/fake-shot" QUERENCIA_STATE_DIR="$T/state" sh "$L"; rc=$?
 [ "$rc" = 0 ] && [ -f "$T/shot" ] && ok "Druck startet das Programm" || nok "Druck startet das Programm" "rc=$rc"
+printf '#!/bin/sh\necho "$*" >"$FAKE/shot-arg"\n' >"$T/bin/fake-shot"
+run WAYLAND_DISPLAY=x QUERENCIA_SCREENSHOT="$T/bin/fake-shot" QUERENCIA_STATE_DIR="$T/state" sh "$L" --window; rc=$?
+[ "$rc" = 0 ] && [ "$(cat "$T/shot-arg" 2>/dev/null)" = "--window" ] && ok "Alt+Druck gibt --window weiter" || nok "Alt+Druck --window" "rc=$rc"
+out=$(run WAYLAND_DISPLAY=x QUERENCIA_SCREENSHOT="$T/bin/fake-shot" sh "$L" --boese 2>&1); rc=$?
+case $rc:$out in 1:*"unbekannte Option"*) ok "Druck: unbekannte Option abgelehnt" ;; *) nok "Druck: unbekannte Option" "rc=$rc $out" ;; esac
 
 # 12 make install into a staging directory, then the same path check
 D="$T/destdir"

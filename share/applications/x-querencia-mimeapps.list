@@ -4,3 +4,12 @@
 # always wins.
 [Default Applications]
 inode/directory=io.github.lgse.Strata.desktop
+# Texte und Bilder wie auf der Entwicklungs-VM (Editor 0.2.0, Bilder 0.1.1);
+# fehlt ein Programm, nimmt GIO das nächste passende.
+text/plain=org.querencia.Editor.desktop
+text/markdown=org.querencia.Editor.desktop
+image/png=org.querencia.Bilder.desktop
+image/jpeg=org.querencia.Bilder.desktop
+image/gif=org.querencia.Bilder.desktop
+image/webp=org.querencia.Bilder.desktop
+image/bmp=org.querencia.Bilder.desktop

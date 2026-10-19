@@ -20,11 +20,16 @@
 #     LABWC=/path/to/labwc          labwc binary (default: labwc in PATH)
 #     PANEL=/path/to/querencia-panel
 #     DESKTOP=/path/to/querencia-desktop   or DESKTOP=none (no desktop)
+#
+# Optional programs from their own packages, started by labwc/autostart
+# when installed in BINDIR: querencia-polkit-agent and querencia-sitzung
+# (idle lock; package querencia-sitzung), querencia-benachrichtigungen,
+# querencia-einstellungen (saved display layout, --bildschirm-anwenden).
 
 set -u
 
 PROGRAM=querencia-session
-VERSION=0.1.0~alpha1
+VERSION=0.1.0~alpha2
 # labwc 0.9.3 (Ubuntu 26.04) gives open panel menus no keyboard focus; see
 # docs/TROUBLESHOOTING.md in the querencia repository.
 LABWC_MIN=0.9.4
@@ -79,6 +84,17 @@ none) DESKTOP= ;;
     [ -x "$DESKTOP" ] || DESKTOP= ;;
 *) DESKTOP=$conf_desktop ;;
 esac
+
+# Optional programs (see above); empty when not installed.
+optional() {
+    if [ -x "$BINDIR/$1" ]; then echo "$BINDIR/$1"; fi
+}
+SITZUNG=$(optional querencia-sitzung)
+POLKIT_AGENT=$(optional querencia-polkit-agent)
+BENACHRICHTIGUNGEN=$(optional querencia-benachrichtigungen)
+EINSTELLUNGEN=$(optional querencia-einstellungen)
+# Idle lock of querencia-sitzung after this many minutes without input.
+LEERLAUF_MINUTEN=10
 
 # A complete user configuration replaces the system one as a whole (labwc
 # reads exactly one directory with -C).
@@ -144,6 +160,10 @@ static_checks() {
         ok=1
     fi
     echo "Arbeitsfläche: ${DESKTOP:-(keine)}"
+    echo "Sitzung:     ${SITZUNG:-(nicht installiert: keine Leerlaufsperre)}"
+    echo "polkit-Agent: ${POLKIT_AGENT:-(nicht installiert)}"
+    echo "Benachrichtigungen: ${BENACHRICHTIGUNGEN:-(nicht installiert)}"
+    echo "Einstellungen: ${EINSTELLUNGEN:-(nicht installiert)}"
     echo "Zustand:     $STATE_DIR"
     return $ok
 }
@@ -295,7 +315,7 @@ if [ -z "${LANG-}" ] && [ -r /etc/default/locale ]; then
 fi
 
 mkdir -p "$STATE_DIR" || die "kann $STATE_DIR nicht anlegen"
-for log in labwc panel desktop; do
+for log in labwc panel desktop sitzung polkit-agent benachrichtigungen bildschirm; do
     if [ -f "$STATE_DIR/$log.log" ]; then
         mv -f "$STATE_DIR/$log.log" "$STATE_DIR/$log.log.1"
     fi
@@ -309,7 +329,11 @@ desktop_file=$STATE_DIR/desktop.$$.pid
 # Read by the autostart file (QUERENCIA_DESKTOP empty: no desktop).
 export QUERENCIA_PANEL="$PANEL" QUERENCIA_STATE_DIR="$STATE_DIR" \
     QUERENCIA_PANEL_RECORD="$panel_file" \
-    QUERENCIA_DESKTOP="$DESKTOP" QUERENCIA_DESKTOP_RECORD="$desktop_file"
+    QUERENCIA_DESKTOP="$DESKTOP" QUERENCIA_DESKTOP_RECORD="$desktop_file" \
+    QUERENCIA_SITZUNG="$SITZUNG" QUERENCIA_LEERLAUF_MINUTEN="$LEERLAUF_MINUTEN" \
+    QUERENCIA_POLKIT_AGENT="$POLKIT_AGENT" \
+    QUERENCIA_BENACHRICHTIGUNGEN="$BENACHRICHTIGUNGEN" \
+    QUERENCIA_EINSTELLUNGEN="$EINSTELLUNGEN"
 echo "$PROGRAM: Panel $PANEL, Arbeitsfläche ${DESKTOP:-(keine)}, Konfiguration $CONFIG_DIR"
 
 cd "$HOME" || die "kann nicht nach $HOME wechseln"

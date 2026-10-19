@@ -4,7 +4,7 @@ Sitzungsstart von [Querencia Desktop](../querencia/README.md): der Starter
 `querencia-session`, die labwc-Konfiguration der Sitzung und die
 Wayland-Sitzungsdatei für Anmeldebildschirme.
 
-> **Status: Alpha (0.1.0~alpha1).** Auf der Entwicklungs-VM läuft noch der
+> **Status: Alpha (0.1.0~alpha2).** Auf der Entwicklungs-VM läuft noch der
 > Entwicklungsstarter (`herkunft/`). Der portable Stand hier ist mit
 > `tests/run.sh` geprüft, aber **noch nicht in einer echten Anmeldung**.
 
@@ -29,8 +29,12 @@ Anmeldebildschirm / Konsole
   └─ querencia-session            prüft: keine andere Sitzung, logind-Sitz, labwc ≥ 0.9.4,
      │                            Konfiguration, querencia-panel; setzt Tastatur/Sprache
      └─ labwc -C /etc/querencia/labwc        (oder ~/.config/querencia/labwc, falls vollständig)
-        └─ autostart  ─ querencia-desktop    Hintergrund, Symbole (optional)
-                      ─ querencia-panel      oberes und unteres Panel
+        └─ autostart  ─ querencia-polkit-agent         Passwortdialog für polkit (optional)
+                      ─ querencia-einstellungen        gespeicherte Bildschirmanordnung (optional)
+                      ─ querencia-desktop              Hintergrund, Symbole (optional)
+                      ─ querencia-panel                oberes und unteres Panel
+                      ─ querencia-benachrichtigungen   Benachrichtigungen (optional)
+                      ─ querencia-sitzung --leerlauf   Leerlaufsperre (optional)
 ```
 
 Abmelden: Menü „System → Abmelden …“ (Panel, `labwc --exit`) oder

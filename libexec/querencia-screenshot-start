@@ -1,9 +1,10 @@
 #!/bin/sh
 # Starts Querencia Screenshot for the Print key (/etc/querencia/labwc/rc.xml).
 #
-# The application is a unique GApplication (org.querencia.Screenshot): if it
-# already runs, starting it again only raises its window over D-Bus, so this
-# launcher never starts a competing instance and never ends one.
+# rc.xml passes at most one capture option: none for Print (the mode
+# window opens; it is a unique GApplication, org.querencia.Screenshot, so a
+# second start only raises it over D-Bus), --window for Alt+Print. This
+# launcher never ends an instance.
 #
 # labwc runs this without a shell and with its own environment (Wayland
 # socket, D-Bus address, XDG variables); exec passes it on unchanged.
@@ -29,6 +30,19 @@ fail() {
 [ -f "$SCREENSHOT" ] || fail "Programm nicht installiert: $SCREENSHOT (Paket querencia-screenshot)"
 [ -x "$SCREENSHOT" ] || fail "Programm nicht ausführbar: $SCREENSHOT"
 
+# Only the documented capture options are passed on; anything else would
+# come from a wrong rc.xml and is refused instead of guessed.
+case $# in
+0) ;;
+1)
+    case $1 in
+    --screen | --window | --area) ;;
+    *) fail "unbekannte Option: $1 (erlaubt: --screen, --window, --area)" ;;
+    esac
+    ;;
+*) fail "zu viele Optionen: $*" ;;
+esac
+
 # Independent of labwc's working directory.
 cd "$HOME" 2>/dev/null || cd /
 
@@ -36,6 +50,6 @@ cd "$HOME" 2>/dev/null || cd /
 # session starter provided one; otherwise it stays with labwc's log.
 if [ -n "${QUERENCIA_STATE_DIR-}" ] && [ -d "$QUERENCIA_STATE_DIR" ] &&
     [ -w "$QUERENCIA_STATE_DIR" ]; then
-    exec "$SCREENSHOT" </dev/null >>"$QUERENCIA_STATE_DIR/screenshot.log" 2>&1
+    exec "$SCREENSHOT" "$@" </dev/null >>"$QUERENCIA_STATE_DIR/screenshot.log" 2>&1
 fi
-exec "$SCREENSHOT" </dev/null
+exec "$SCREENSHOT" "$@" </dev/null

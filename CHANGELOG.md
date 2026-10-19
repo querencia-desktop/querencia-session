@@ -3,6 +3,28 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha2] – unveröffentlicht
+
+Live-Stand der Entwicklungs-VM vom 20.10.2026, portabel (G2-F).
+
+### Hinzugefügt
+- autostart startet, wenn installiert: polkit-Agent und Leerlaufsperre
+  (`querencia-sitzung`), Benachrichtigungsdienst
+  (`querencia-benachrichtigungen`), gespeicherte Bildschirmanordnung
+  (`querencia-einstellungen --bildschirm-anwenden`); `--check` zeigt sie an.
+- rc.xml: Alt+Druck (Fensteraufnahme), Strg+Alt+L (sperren),
+  Strg+Alt+Entf (Sitzungsdialog), Super+? (Tastenkürzel), Fensterregeln für
+  Sitzungs- und polkit-Dialog, Alt+Tab-Liste, Theme Querencia-Klassisch mit
+  Symbolthema gnome-human.
+- `querencia-screenshot-start` reicht `--screen`, `--window`, `--area`
+  weiter, andere Optionen lehnt es ab.
+- `x-querencia-mimeapps.list`: Texte → Querencia Editor, Bilder →
+  Querencia Bilder (nur in der Querencia-Sitzung).
+
+### Nicht übernommen
+- Benutzerkopie der labwc-Konfiguration mit Abgleich
+  (`session/labwc-benutzer-0.1` der Runtime): folgt als eigener Schritt.
+
 ## [0.1.0~alpha1] – unveröffentlicht
 
 Erster portabler Stand (QREL-01).
