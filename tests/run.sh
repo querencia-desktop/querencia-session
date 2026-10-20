@@ -66,7 +66,7 @@ done
 
 # 2 version
 out=$(run sh "$S" --version)
-[ "$out" = "querencia-session 0.1.0~alpha4" ] && ok "--version" || nok "--version" "$out"
+[ "$out" = "querencia-session 0.1.0~alpha5" ] && ok "--version" || nok "--version" "$out"
 
 # 3 --check finds labwc, configuration, panel and desktop
 out=$(run sh "$S" --check); rc=$?
@@ -160,7 +160,7 @@ rm -f "$T/home/.config/querencia/session.conf"
 U=$T/home/.config/querencia/labwc
 out=$(run sh "$S" --labwc-konfig-abgleichen 2>&1); rc=$?
 [ "$rc" = 0 ] && cmp -s "$U/rc.xml" "$T/etc/querencia/labwc/rc.xml" && cmp -s "$U/.vorgabe/autostart" "$T/etc/querencia/labwc/autostart" &&
-    grep -q "querencia-session 0.1.0~alpha4" "$U/.vorgabe/stand" && ok "Abgleich legt Benutzerkopie und .vorgabe an" || nok "Abgleich anlegen" "rc=$rc $out"
+    grep -q "querencia-session 0.1.0~alpha5" "$U/.vorgabe/stand" && ok "Abgleich legt Benutzerkopie und .vorgabe an" || nok "Abgleich anlegen" "rc=$rc $out"
 echo '# eigene Zeile' >>"$U/rc.xml"
 cp "$T/etc/querencia/labwc/environment" "$T/env.orig"
 echo 'NEU=1' >>"$T/etc/querencia/labwc/environment"

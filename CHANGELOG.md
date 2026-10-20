@@ -3,6 +3,15 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha5] – unveröffentlicht
+
+### Geändert
+- `x-querencia-portals.conf`: `default=gtk` und
+  `org.freedesktop.impl.portal.Secret=gnome-keyring` statt `default=gtk;*`
+  (QD-077): mit `*` zog xdg-desktop-portal auf Ubuntu Desktop auch
+  xdg-desktop-portal-gnome heran, das außerhalb von GNOME rund zwei Minuten
+  hängt.
+
 ## [0.1.0~alpha4] – unveröffentlicht
 
 Sauberer Sitzungsstart und Benutzerkopie wie auf der Entwicklungs-VM (Runtime
