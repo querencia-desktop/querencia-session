@@ -13,3 +13,5 @@ image/jpeg=org.querencia.Bilder.desktop
 image/gif=org.querencia.Bilder.desktop
 image/webp=org.querencia.Bilder.desktop
 image/bmp=org.querencia.Bilder.desktop
+# PDF wie auf der Entwicklungs-VM (Dokumente 0.1.0, live seit 20.10.2026).
+application/pdf=org.querencia.Dokumente.desktop

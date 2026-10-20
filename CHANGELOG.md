@@ -14,6 +14,8 @@ labwc-Vorgabe wie auf der Entwicklungs-VM (Runtime main 4557927, live seit
   Schriften DejaVu Sans 10, Fenstertitel und Menüüberschrift fett;
   `iconPriority="client"` für Einstellungen, Editor und Systemmonitor.
 - `environment`: Zeiger DMZ-White 24 (`XCURSOR_THEME`, `XCURSOR_SIZE`).
+- `x-querencia-mimeapps.list`: PDF mit Querencia Dokumente
+  (`application/pdf`).
 
 ## [0.1.0~alpha2] – unveröffentlicht
 
