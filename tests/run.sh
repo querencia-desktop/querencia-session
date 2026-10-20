@@ -22,6 +22,31 @@ cat >"$T/bin/labwc" <<'X'
 [ "${1-}" = --version ] && { echo "labwc $(cat "$FAKE/labwc-version") (+xwayland +nls +rsvg +libsfdo)"; exit 0; }
 echo "fake labwc started: $*" >>"$FAKE/started"; exit 0
 X
+# Fakes for the user manager, D-Bus and logind: they record their calls and
+# never reach the real ones (systemctl/busctl of a test must not touch the
+# running session's user manager).
+cat >"$T/bin/systemctl" <<'X'
+#!/bin/sh
+echo "$*" >>"$FAKE/systemctl.log"
+case "$*" in
+*is-active*) if [ -e "$FAKE/portal-active" ]; then printf 'active\nactive\n'; else printf 'inactive\ninactive\n'; exit 3; fi ;;
+*show-environment*) printf 'LANG=C.UTF-8\nPATH=/usr/bin\n' ;;
+esac
+exit 0
+X
+cat >"$T/bin/busctl" <<'X'
+#!/bin/sh
+echo "$*" >>"$FAKE/busctl.log"
+[ -e "$FAKE/portal-answers" ]
+X
+cat >"$T/bin/dbus-update-activation-environment" <<'X'
+#!/bin/sh
+echo "$*" >>"$FAKE/dbus-env.log"
+X
+cat >"$T/bin/loginctl" <<'X'
+#!/bin/sh
+case "$*" in *"-p Seat"*) echo seat0 ;; *"-p State"*) echo closing ;; esac
+X
 printf '#!/bin/sh\nexit 0\n' >"$T/bin/querencia-panel"
 printf '#!/bin/sh\nexit 0\n' >"$T/bin/querencia-desktop"
 chmod 755 "$T/bin/"*
@@ -41,12 +66,12 @@ done
 
 # 2 version
 out=$(run sh "$S" --version)
-[ "$out" = "querencia-session 0.1.0~alpha3" ] && ok "--version" || nok "--version" "$out"
+[ "$out" = "querencia-session 0.1.0~alpha4" ] && ok "--version" || nok "--version" "$out"
 
 # 3 --check finds labwc, configuration, panel and desktop
 out=$(run sh "$S" --check); rc=$?
 case $rc:$out in
-0:*"labwc:       $T/bin/labwc (0.9.8)"*"Konfiguration: $T/etc/querencia/labwc"*"Panel:       $T/bin/querencia-panel"*"Arbeitsfläche: $T/bin/querencia-desktop"*) ok "--check vollständig" ;;
+0:*"labwc:       $T/bin/labwc (0.9.8)"*"Vorgabe:     $T/etc/querencia/labwc"*"Konfiguration: $T/home/.config/querencia/labwc (Benutzerkopie"*"Panel:       $T/bin/querencia-panel"*"Arbeitsfläche: $T/bin/querencia-desktop"*) ok "--check vollständig" ;;
 *) nok "--check vollständig" "rc=$rc $out" ;;
 esac
 
@@ -63,8 +88,9 @@ case $rc:$out in 0:*"Sitzung:     $T/bin/querencia-sitzung"*"polkit-Agent: $T/bi
 # 3b autostart starts exactly what the starter passes (fake programs record
 # their arguments; nothing of a real session is touched)
 A=$T/autostart; mkdir -p "$A/state"
+touch "$T/portal-answers"
 for p in panel desktop sitzung polkit benach einst; do
-    printf '#!/bin/sh\necho "%s $*" >>"$FAKE/autostart.txt"\n' "$p" >"$A/$p"; chmod 755 "$A/$p"
+    printf '#!/bin/sh\necho "%s $*" >>"$FAKE/autostart.txt"\necho "%s ${GDK_DEBUG-}" >>"$FAKE/gdk.txt"\n' "$p" "$p" >"$A/$p"; chmod 755 "$A/$p"
 done
 run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
     QUERENCIA_DESKTOP="$A/desktop" QUERENCIA_DESKTOP_RECORD="$A/state/desktop.pid" \
@@ -80,6 +106,21 @@ run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RE
 sleep 0.5
 got=$(cat "$T/autostart.txt" 2>/dev/null | tr '\n' '|')
 [ "$got" = "panel |" ] && ok "autostart ohne optionale Programme: nur Panel" || nok "autostart ohne optionale Programme" "$got"
+case $(cat "$A/state/sitzung-start.log" 2>/dev/null) in *"Settings-Portal antwortet nach"*) ok "autostart: Portal-Wächter, Portal antwortet" ;; *) nok "autostart: Portal antwortet" ;; esac
+[ -z "$(grep -v ' $' "$T/gdk.txt")" ] && ok "autostart: ohne no-portals, wenn das Portal antwortet" || nok "autostart: GDK_DEBUG" "$(cat "$T/gdk.txt")"
+# 3c portal does not answer: GTK programs without the portal, portals
+# stopped for a fresh start (fake systemctl), idle lock and display layout
+# unchanged
+rm -f "$T/portal-answers" "$T/autostart.txt" "$T/gdk.txt" "$T/systemctl.log" "$A/state/sitzung-start.log"
+run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
+    QUERENCIA_DESKTOP="$A/desktop" QUERENCIA_DESKTOP_RECORD="$A/state/desktop.pid" \
+    QUERENCIA_SITZUNG="$A/sitzung" QUERENCIA_POLKIT_AGENT="$A/polkit" \
+    QUERENCIA_BENACHRICHTIGUNGEN="$A/benach" QUERENCIA_EINSTELLUNGEN="$A/einst" GDK_DEBUG=x sh "$ROOT/labwc/autostart"
+sleep 0.5
+got=$(sort "$T/gdk.txt" 2>/dev/null | tr '\n' '|')
+[ "$got" = "benach x,no-portals|desktop x,no-portals|einst x|panel x,no-portals|polkit x,no-portals|sitzung x|" ] && ok "autostart: ohne Portal GDK_DEBUG=no-portals für GTK-Programme" || nok "autostart: ohne Portal" "$got"
+case $(cat "$A/state/sitzung-start.log" 2>/dev/null) in *"antwortet nicht in 1,5 s"*) ok "autostart: Meldung ohne Portal" ;; *) nok "autostart: Meldung ohne Portal" ;; esac
+grep -q 'stop xdg-desktop-portal-gtk.service xdg-desktop-portal.service' "$T/systemctl.log" 2>/dev/null && ok "autostart: Portal wird neu angestoßen" || nok "autostart: Portal-Stopp"
 rm -f "$T/bin/querencia-sitzung" "$T/bin/querencia-polkit-agent" "$T/bin/querencia-benachrichtigungen" "$T/bin/querencia-einstellungen"
 
 # 4 labwc versions
@@ -115,15 +156,23 @@ out=$(run sh "$S" --check 2>&1)
 case $out in *"unbekannter Eintrag ignoriert: UNSINN"*) ok "unbekannter Eintrag gemeldet" ;; *) nok "unbekannter Eintrag" "$out" ;; esac
 rm -f "$T/home/.config/querencia/session.conf"
 
-# 7 user configuration only when complete
-mkdir -p "$T/home/.config/querencia/labwc"
-cp "$ROOT/labwc/autostart" "$T/home/.config/querencia/labwc/"
+# 7 labwc configuration: user copy kept in step with the defaults (G2-AG)
+U=$T/home/.config/querencia/labwc
+out=$(run sh "$S" --labwc-konfig-abgleichen 2>&1); rc=$?
+[ "$rc" = 0 ] && cmp -s "$U/rc.xml" "$T/etc/querencia/labwc/rc.xml" && cmp -s "$U/.vorgabe/autostart" "$T/etc/querencia/labwc/autostart" &&
+    grep -q "querencia-session 0.1.0~alpha4" "$U/.vorgabe/stand" && ok "Abgleich legt Benutzerkopie und .vorgabe an" || nok "Abgleich anlegen" "rc=$rc $out"
+echo '# eigene Zeile' >>"$U/rc.xml"
+cp "$T/etc/querencia/labwc/environment" "$T/env.orig"
+echo 'NEU=1' >>"$T/etc/querencia/labwc/environment"
+echo '<!-- neu -->' >>"$T/etc/querencia/labwc/rc.xml"
+out=$(run sh "$S" --labwc-konfig-abgleichen 2>&1)
+grep -qx 'NEU=1' "$U/environment" && ls "$U"/environment.vorher-* >/dev/null 2>&1 && ok "unveränderte Datei folgt der neuen Vorgabe" || nok "neue Vorgabe" "$out"
+grep -q '# eigene Zeile' "$U/rc.xml" && [ -f "$U/rc.xml.vorgabe-neu" ] && ok "geänderte Datei bleibt, neue Vorgabe daneben" || nok "eigene Datei" "$out"
+cp "$ROOT/labwc/rc.xml" "$T/etc/querencia/labwc/rc.xml"; cp "$T/env.orig" "$T/etc/querencia/labwc/environment"
+touch "$T/home/.config/querencia/labwc-alter-weg"
 out=$(run sh "$S" --check)
-case $out in *"Konfiguration: $T/etc/querencia/labwc"*) ok "unvollständige Benutzerkonfiguration ignoriert" ;; *) nok "unvollständige Benutzerkonfiguration" "$out" ;; esac
-cp "$ROOT/labwc/environment" "$T/home/.config/querencia/labwc/"
-out=$(run sh "$S" --check)
-case $out in *"Konfiguration: $T/home/.config/querencia/labwc"*) ok "Benutzerkonfiguration gewählt" ;; *) nok "Benutzerkonfiguration" "$out" ;; esac
-rm -rf "$T/home/.config/querencia/labwc"
+case $out in *"Konfiguration: $T/etc/querencia/labwc (alter Weg"*) ok "alter Weg: labwc liest die Vorgabe" ;; *) nok "alter Weg" "$out" ;; esac
+rm -rf "$U" "$T/home/.config/querencia/labwc-alter-weg"
 
 # 8 start refused outside a proper login; labwc is never started
 rm -f "$T/started"
@@ -187,11 +236,43 @@ D="$T/destdir"
 if make -s -C "$ROOT" install DESTDIR="$D" >/dev/null; then ok "make install"; else nok "make install"; fi
 for f in /usr/bin/querencia-session /usr/libexec/querencia/querencia-screenshot-start \
     /etc/querencia/labwc/rc.xml /etc/querencia/labwc/environment /etc/querencia/labwc/autostart \
-    /usr/share/wayland-sessions/querencia.desktop /usr/share/applications/x-querencia-mimeapps.list; do
+    /usr/share/wayland-sessions/querencia.desktop /usr/share/applications/x-querencia-mimeapps.list \
+    /usr/share/xdg-desktop-portal/x-querencia-portals.conf; do
     [ -f "$D$f" ] || nok "installiert: $f"
 done
 [ -x "$D/usr/bin/querencia-session" ] && [ -x "$D/usr/libexec/querencia/querencia-screenshot-start" ] && ok "installierte Dateien und Rechte" || nok "Rechte"
 cmp -s "$ROOT/bin/querencia-session" "$D/usr/bin/querencia-session" && ok "Standardpfade: Starter unverändert installiert" || nok "Starter verändert"
+
+# 13 a whole start with a fake labwc: user copy, locale and desktop for
+# D-Bus activation, fresh portals before and after, values put back, logs
+# with five generations (fakes only; the real user manager is never asked)
+cat >"$T/bin/labwc" <<'X'
+#!/bin/sh
+[ "${1-}" = --version ] && { echo "labwc $(cat "$FAKE/labwc-version") (+xwayland +nls +rsvg +libsfdo)"; exit 0; }
+echo "fake labwc started: $* QE_LABWC_VORGABE=${QE_LABWC_VORGABE-} LANG=${LANG-}" >>"$FAKE/started"; exit 0
+X
+chmod 755 "$T/bin/labwc"
+mkdir -p "$T/run" "$T/home/.local/state/querencia"
+for i in 1 2 3 4 5; do echo "alt $i" >"$T/home/.local/state/querencia/panel.log.$i"; done
+echo "vorige" >"$T/home/.local/state/querencia/panel.log"
+rm -f "$T/started" "$T/systemctl.log" "$T/dbus-env.log"; touch "$T/portal-active"
+run XDG_RUNTIME_DIR="$T/run" XDG_SESSION_ID=7 LANG=de_DE.UTF-8 sh "$S" >"$T/start.out" 2>&1; rc=$?
+SL=$T/home/.local/state/querencia/sitzung-start.log
+[ "$rc" = 0 ] && grep -q "fake labwc started: -C $T/home/.config/querencia/labwc QE_LABWC_VORGABE=$T/etc/querencia/labwc LANG=de_DE.UTF-8" "$T/started" 2>/dev/null &&
+    ok "Start: labwc liest die Benutzerkopie, QE_LABWC_VORGABE gesetzt" || nok "Start" "rc=$rc $(cat "$T/start.out" "$SL" 2>/dev/null)"
+order=$(grep -o -e 'Aktivierungsumgebung gesetzt' -e 'Portale gestoppt (vor dem Start' -e 'starte ' -e 'Portale gestoppt (nach dem Ende' -e 'Aktivierungsumgebung zurückgesetzt' -e 'labwc beendet' "$SL" | tr '\n' '|')
+[ "$order" = "Aktivierungsumgebung gesetzt|Portale gestoppt (vor dem Start|starte |Portale gestoppt (nach dem Ende|Aktivierungsumgebung zurückgesetzt|labwc beendet|" ] &&
+    ok "Start: Reihenfolge Aktivierung, Portale, labwc, Portale, Rücknahme" || nok "Start: Reihenfolge" "$order"
+grep -q 'set-environment LANG=de_DE.UTF-8 XDG_CURRENT_DESKTOP=X-Querencia XDG_SESSION_TYPE=wayland XDG_SESSION_DESKTOP=querencia XCURSOR_THEME=DMZ-White XCURSOR_SIZE=24' "$T/systemctl.log" &&
+    grep -q 'LANG=de_DE.UTF-8 XDG_CURRENT_DESKTOP=X-Querencia' "$T/dbus-env.log" && ok "Start: Locale und Desktop für systemd und D-Bus (QD-064)" || nok "Start: Aktivierungsumgebung" "$(cat "$T/systemctl.log")"
+grep -q 'set-environment LANG=C.UTF-8' "$T/systemctl.log" && grep -q 'unset-environment XDG_CURRENT_DESKTOP' "$T/systemctl.log" &&
+    ok "Start: alte Werte nach dem Ende zurück" || nok "Start: Rücknahme" "$(cat "$T/systemctl.log")"
+[ "$(grep -c 'reset-failed xdg-desktop-portal-gtk.service xdg-desktop-portal.service' "$T/systemctl.log")" = 4 ] && ok "Start: reset-failed vor und nach jedem Portal-Stopp" || nok "Start: reset-failed"
+[ "$(cat "$T/home/.local/state/querencia/panel.log.1")" = vorige ] && [ "$(cat "$T/home/.local/state/querencia/panel.log.5")" = "alt 4" ] &&
+    ok "Start: fünf Log-Generationen" || nok "Start: Log-Generationen"
+[ -f "$T/home/.config/querencia/labwc/.vorgabe/stand" ] && ok "Start: Benutzerkopie abgeglichen" || nok "Start: Benutzerkopie"
+[ ! -e "$T/home/.local/state/querencia/aktivierungsumgebung.vorher" ] && ok "Start: Sicherung der Aktivierungsumgebung aufgeräumt" || nok "Start: Sicherung"
+rm -f "$T/portal-active"
 
 echo "Ergebnis: $pass bestanden, $fail fehlgeschlagen"
 [ "$fail" -eq 0 ]

@@ -20,3 +20,9 @@ XDG_SESSION_DESKTOP=querencia
 # Xwayland and programs that do not read gsettings.
 XCURSOR_THEME=DMZ-White
 XCURSOR_SIZE=24
+
+# GTK 4.22 draws up to 1 px beyond node bounds when it redraws only part of
+# a window with hinting; pale remains of text stay after a page change
+# (QD-070). Full redraws avoid that for every GTK 4 program of the session.
+# Applies to labwc and its children only, not to D-Bus activation.
+GSK_DEBUG=full-redraw

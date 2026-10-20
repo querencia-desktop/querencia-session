@@ -24,7 +24,8 @@ all:
 install:
 	$(INSTALL) -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(LIBEXECDIR)/querencia \
 		$(DESTDIR)$(SYSCONFDIR)/querencia/labwc \
-		$(DESTDIR)$(DATADIR)/wayland-sessions $(DESTDIR)$(DATADIR)/applications
+		$(DESTDIR)$(DATADIR)/wayland-sessions $(DESTDIR)$(DATADIR)/applications \
+		$(DESTDIR)$(DATADIR)/xdg-desktop-portal
 	$(SUBST) bin/querencia-session >$(DESTDIR)$(BINDIR)/querencia-session
 	chmod 0755 $(DESTDIR)$(BINDIR)/querencia-session
 	$(SUBST) libexec/querencia-screenshot-start >$(DESTDIR)$(LIBEXECDIR)/querencia/querencia-screenshot-start
@@ -35,6 +36,7 @@ install:
 	$(SUBST) share/wayland-sessions/querencia.desktop >$(DESTDIR)$(DATADIR)/wayland-sessions/querencia.desktop
 	chmod 0644 $(DESTDIR)$(DATADIR)/wayland-sessions/querencia.desktop
 	$(INSTALL) -m 0644 share/applications/x-querencia-mimeapps.list $(DESTDIR)$(DATADIR)/applications/
+	$(INSTALL) -m 0644 share/xdg-desktop-portal/x-querencia-portals.conf $(DESTDIR)$(DATADIR)/xdg-desktop-portal/
 
 check:
 	sh tests/run.sh

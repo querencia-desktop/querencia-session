@@ -8,12 +8,43 @@
 #   querencia-session          start the session (display manager or console login)
 #   querencia-session --exit   end the running Querencia session (also from SSH)
 #   querencia-session --check  show what would be started and check it; starts nothing
+#   querencia-session --labwc-konfig-abgleichen
+#                              only bring the user copy of the labwc
+#                              configuration up to date (see below); inside
+#                              the session labwc --reconfigure reloads it
 #   querencia-session --version
 #
 # Portable successor of the development starter (herkunft/session/): no
-# fixed home or project paths, labwc from PATH, configuration from
-# /etc/querencia or the user's ~/.config/querencia. The checks against
-# double starts and the clean-up after labwc are unchanged.
+# fixed home or project paths, labwc from PATH, configuration defaults from
+# /etc/querencia/labwc.
+#
+# labwc configuration (G2-AG of the development starter): labwc reads
+# rc.xml, autostart, environment and menu.xml from the user copy
+# ~/.config/querencia/labwc, where Querencia Einstellungen may change them.
+# /etc/querencia/labwc only holds the defaults; before each start
+# konfig_abgleichen copies missing files and updates those the user has not
+# changed. labwc reads /etc/querencia/labwc directly if
+# ~/.config/querencia/labwc-alter-weg exists or the user copy cannot be set
+# up.
+#
+# A clean start and end (QD-062, G2-AI of the development starter). The
+# systemd user manager may outlive a logout (lingering, SSH sessions, a
+# display manager that keeps it for UserStopDelaySec), and with it D-Bus,
+# xdg-desktop-portal and gvfs. Before labwc starts and after it ends, the
+# starter therefore
+#   - ends what is left of an earlier Querencia session of this user in
+#     this XDG_RUNTIME_DIR (panel, desktop, notifications, polkit agent,
+#     idle lock, applet helpers; a labwc only if its logind session is gone),
+#   - stops xdg-desktop-portal and xdg-desktop-portal-gtk (systemctl --user,
+#     reset-failed before and after), so the next GTK program activates them
+#     afresh with this session's WAYLAND_DISPLAY instead of meeting a portal
+#     that waits for a closed display (gvfs and the document portal stay),
+#   - before that, gives the user manager and the D-Bus activation
+#     environment the session's locale and desktop variables, and puts the
+#     previous values back at the end (QD-064),
+#   - keeps five generations of every log (NAME.log.1 … NAME.log.5) and
+#     writes its own lines, each with the time, to sitzung-start.log.
+# Isolated test sessions (their own XDG_RUNTIME_DIR) are never touched.
 #
 # Optional settings (KEY=VALUE, first match wins, never sourced as shell):
 #   ~/.config/querencia/session.conf, then /etc/querencia/session.conf
@@ -29,7 +60,7 @@
 set -u
 
 PROGRAM=querencia-session
-VERSION=0.1.0~alpha3
+VERSION=0.1.0~alpha4
 # labwc 0.9.3 (Ubuntu 26.04) gives open panel menus no keyboard focus; see
 # docs/TROUBLESHOOTING.md in the querencia repository.
 LABWC_MIN=0.9.4
@@ -40,9 +71,21 @@ BINDIR=${QUERENCIA_BINDIR:-/usr/bin}
 
 CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 STATE_DIR=${XDG_STATE_HOME:-$HOME/.local/state}/querencia
+# Defaults (Vorgaben) of the package, the user copy labwc reads, and the
+# switch back to the defaults. CONFIG_DIR is chosen right before labwc
+# starts.
+VORGABE_DIR=$SYSCONFDIR/querencia/labwc
+BENUTZER_DIR=$CONFIG_HOME/querencia/labwc
+ALTER_WEG=$CONFIG_HOME/querencia/labwc-alter-weg
+CONFIG_DIR=$VORGABE_DIR
 
 die() {
-    echo "$PROGRAM: $*" >&2
+    echo "$(date +%T.%3N) $PROGRAM: $*" >&2
+    # Once the output goes to sitzung-start.log, the login's stderr (the
+    # display manager's journal, the console) still gets the reason.
+    if [ -n "${stderr_saved-}" ]; then
+        echo "$PROGRAM: $*" >&3
+    fi
     exit 1
 }
 
@@ -96,15 +139,6 @@ EINSTELLUNGEN=$(optional querencia-einstellungen)
 # Idle lock of querencia-sitzung after this many minutes without input.
 LEERLAUF_MINUTEN=10
 
-# A complete user configuration replaces the system one as a whole (labwc
-# reads exactly one directory with -C).
-if [ -r "$CONFIG_HOME/querencia/labwc/autostart" ] &&
-    [ -r "$CONFIG_HOME/querencia/labwc/environment" ]; then
-    CONFIG_DIR=$CONFIG_HOME/querencia/labwc
-else
-    CONFIG_DIR=$SYSCONFDIR/querencia/labwc
-fi
-
 # --- helpers ------------------------------------------------------------
 
 # Succeeds if dotted version $1 is at least $2 (numeric parts; a suffix
@@ -127,6 +161,16 @@ labwc_version() {
     "$LABWC" --version 2>/dev/null | sed -n '1s/^labwc \([^ ]*\).*/\1/p'
 }
 
+# The directory labwc will read: the user copy, unless the defaults are
+# asked for. Whether the user copy can be set up shows only at the start.
+planned_config_dir() {
+    if [ -e "$ALTER_WEG" ]; then
+        echo "$VORGABE_DIR"
+    else
+        echo "$BENUTZER_DIR"
+    fi
+}
+
 # Checks everything that does not need a session; prints one line per item.
 # Returns 1 if anything needed is missing.
 static_checks() {
@@ -147,12 +191,17 @@ static_checks() {
         fi
     fi
     for file in environment autostart; do
-        if [ ! -r "$CONFIG_DIR/$file" ]; then
-            echo "Konfiguration: FEHLT $CONFIG_DIR/$file"
+        if [ ! -r "$VORGABE_DIR/$file" ]; then
+            echo "Vorgabe:     FEHLT $VORGABE_DIR/$file"
             ok=1
         fi
     done
-    echo "Konfiguration: $CONFIG_DIR"
+    echo "Vorgabe:     $VORGABE_DIR"
+    if [ -e "$ALTER_WEG" ]; then
+        echo "Konfiguration: $VORGABE_DIR (alter Weg: $ALTER_WEG)"
+    else
+        echo "Konfiguration: $BENUTZER_DIR (Benutzerkopie, vor dem Start abgeglichen)"
+    fi
     if [ -x "$PANEL" ]; then
         echo "Panel:       $PANEL"
     else
@@ -183,8 +232,10 @@ case $boot_id in
 '' | *[!0-9a-f-]*) boot_id= ;;
 esac
 
-# The exact argument list the starter gives labwc, one argument per line.
-labwc_argv=$(printf '%s\n' "$LABWC" -C "$CONFIG_DIR")
+# The exact argument lists the starter gives labwc, one argument per line:
+# the user copy, or the defaults (old way, fallback).
+labwc_argv_benutzer=$(printf '%s\n' "$LABWC" -C "$BENUTZER_DIR")
+labwc_argv_vorgabe=$(printf '%s\n' "$LABWC" -C "$VORGABE_DIR")
 
 # labwc record, one line: "q2 BOOTID PID STARTTIME".
 labwc_record_for() {
@@ -193,11 +244,12 @@ labwc_record_for() {
 }
 
 # Succeeds while labwc record $1 still describes the very labwc this starter
-# runs: same boot, same user, exactly the arguments
-# "LABWC -C CONFIG_DIR" (NUL-separated /proc/PID/cmdline, no further
-# arguments, no newline inside an argument) and the same start time. The
-# start time is compared last, so a PID reused during the other checks is
-# caught as well. Anything else, including malformed records, is rejected.
+# runs: same boot, same user, exactly the arguments "LABWC -C <dir>" with
+# the user copy or the defaults as <dir> (NUL-separated /proc/PID/cmdline,
+# no further arguments, no newline inside an argument) and the same start
+# time. The start time is compared last, so a PID reused during the other
+# checks is caught as well. Anything else, including malformed records, is
+# rejected.
 labwc_matches() {
     [ -n "$boot_id" ] || return 1
     case $1 in '' | *[!0-9a-fq\ -]*) return 1 ;; esac
@@ -210,7 +262,8 @@ labwc_matches() {
     cmdline=/proc/$pid/cmdline
     [ "$(tr -cd '\000' <"$cmdline" 2>/dev/null | wc -c)" -eq 3 ] || return 1
     [ "$(tr -cd '\n' <"$cmdline" 2>/dev/null | wc -c)" -eq 0 ] || return 1
-    [ "$(tr '\000' '\n' <"$cmdline" 2>/dev/null)" = "$labwc_argv" ] || return 1
+    argv=$(tr '\000' '\n' <"$cmdline" 2>/dev/null)
+    [ "$argv" = "$labwc_argv_benutzer" ] || [ "$argv" = "$labwc_argv_vorgabe" ] || return 1
     [ "$(starttime "$pid")" = "$start" ]
 }
 
@@ -233,10 +286,287 @@ remove_record() {
     fi
 }
 
-# Succeeds if a process of this user runs program $1, judged by the first
-# word of its command line (with or without a path).
+# PIDs of this user's processes running program $1, judged by the first
+# word of the command line (with or without a path), and only those with
+# this session's XDG_RUNTIME_DIR: isolated test sessions use their own and
+# are none of the starter's business.
+pids_here() {
+    for p in $(pgrep -u "$(id -u)" -f "^([^ ]*/)?$1( |\$)"); do
+        if tr '\000' '\n' 2>/dev/null <"/proc/$p/environ" |
+            grep -qx "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"; then
+            echo "$p"
+        fi
+    done
+}
+
+# Succeeds if a process of this user runs program $1 here (see pids_here).
 running() {
-    pgrep -u "$(id -u)" -f "^([^ ]*/)?$1( |\$)" >/dev/null
+    [ -n "$(pids_here "$1")" ]
+}
+
+# Programs of a Querencia session that end with it (kept in step with
+# querencia-sitzung, aufraeumen.rs); querencia-sitzung only as idle lock.
+SESSION_PROGRAMS="querencia-panel querencia-desktop querencia-benachrichtigungen querencia-polkit-agent querencia-lautstaerke querencia-netzwerk"
+
+# Session programs of this user here; with $1, only those of labwc $1
+# (LABWC_PID in their environment). One "PID NAME" per line.
+session_leftovers() {
+    for program in $SESSION_PROGRAMS querencia-sitzung; do
+        for p in $(pids_here "$program"); do
+            if [ "$program" = querencia-sitzung ] &&
+                ! tr '\000' '\n' 2>/dev/null <"/proc/$p/cmdline" | grep -qx -e --leerlauf -e --leerlauf-sekunden; then
+                continue
+            fi
+            if [ -n "${1-}" ] && ! tr '\000' '\n' 2>/dev/null <"/proc/$p/environ" | grep -qx "LABWC_PID=$1"; then
+                continue
+            fi
+            echo "$p $program"
+        done
+    done
+}
+
+# Ends the processes "PID NAME" on stdin: SIGTERM, up to 2 s, then SIGKILL.
+# A PID is only signalled while it still has the start time noted before.
+end_processes() {
+    list=
+    while read -r p name; do
+        start=$(starttime "$p") || continue
+        list="$list $p:$start:$name"
+        echo "$(date +%T.%3N) $PROGRAM: beende $name ($p), SIGTERM"
+        kill -TERM "$p" 2>/dev/null
+    done
+    [ -n "$list" ] || return 0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        alive=
+        for e in $list; do
+            p=${e%%:*} rest=${e#*:}
+            [ "$(starttime "$p")" = "${rest%%:*}" ] && alive=ja
+        done
+        [ -n "$alive" ] || return 0
+        sleep 0.2
+    done
+    for e in $list; do
+        p=${e%%:*} rest=${e#*:}
+        if [ "$(starttime "$p")" = "${rest%%:*}" ]; then
+            echo "$(date +%T.%3N) $PROGRAM: ${rest#*:} ($p) reagiert nicht, SIGKILL"
+            kill -KILL "$p" 2>/dev/null
+        fi
+    done
+}
+
+# The settings portal and its GTK backend of the user manager. Stopped, the
+# next GTK program activates them again through D-Bus, with the activation
+# environment of the session that is running then.
+PORTAL_UNITS="xdg-desktop-portal-gtk.service xdg-desktop-portal.service"
+portals_reset() {
+    systemctl --user reset-failed $PORTAL_UNITS 2>/dev/null
+    active=$(systemctl --user is-active $PORTAL_UNITS 2>/dev/null | tr '\n' ' ')
+    case " $active" in
+    *" active "* | *" activating "* | *" deactivating "* | *" reloading "*)
+        if systemctl --user stop $PORTAL_UNITS 2>&1; then
+            echo "$(date +%T.%3N) $PROGRAM: Portale gestoppt ($1; vorher: $active)"
+        else
+            echo "$(date +%T.%3N) $PROGRAM: Portale ließen sich nicht stoppen ($1)"
+        fi
+        ;;
+    *) echo "$(date +%T.%3N) $PROGRAM: Portale laufen nicht ($1; $active)" ;;
+    esac
+    systemctl --user reset-failed $PORTAL_UNITS 2>/dev/null
+}
+
+# Session environment for programs the user manager or D-Bus activation
+# starts (QD-064): they inherit the user manager's environment, not labwc's.
+# Before labwc starts, the values labwc will use go to the user manager and
+# the D-Bus activation environment, like gnome-session does: those of its
+# environment file and environment.d/*.env (the later file wins, as in
+# labwc), and for the locale variables this starter's own values (from the
+# login or /etc/default/locale, see below) when the files do not set them.
+# The user manager's previous values are kept in
+# $STATE_DIR/aktivierungsumgebung.vorher and put back after labwc has ended,
+# so the next session inherits nothing stale. Only variables the session
+# sets are touched.
+LOCALE_VARS="LANG LANGUAGE LC_ALL LC_MESSAGES LC_TIME LC_NUMERIC LC_MONETARY LC_PAPER LC_MEASUREMENT"
+ACTIVATION_VARS="$LOCALE_VARS XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP DESKTOP_SESSION XCURSOR_THEME XCURSOR_SIZE GTK_THEME"
+activation_saved=$STATE_DIR/aktivierungsumgebung.vorher
+
+# Value of variable $1 for the session: the last one in labwc's
+# environment files in $CONFIG_DIR, else for a locale variable the
+# starter's own; fails if there is none.
+session_value() {
+    found=
+    for f in "$CONFIG_DIR/environment" "$CONFIG_DIR"/environment.d/*.env; do
+        [ -f "$f" ] || continue
+        line=$(grep -E "^[[:space:]]*$1=" "$f" | tail -n 1)
+        if [ -n "$line" ]; then
+            value=${line#*=}
+            found=ja
+        fi
+    done
+    if [ -z "$found" ]; then
+        case " $LOCALE_VARS " in
+        *" $1 "*)
+            eval "value=\${$1-}"
+            [ -n "$value" ] && found=ja
+            ;;
+        esac
+    fi
+    [ -n "$found" ] && printf '%s\n' "$value"
+}
+
+activation_export() {
+    # Keep the values from before the first session of this boot; a
+    # record from an earlier boot or without boot ID is replaced.
+    if [ "$(head -n 1 "$activation_saved" 2>/dev/null)" != "# boot $boot_id" ]; then
+        {
+            echo "# boot $boot_id"
+            systemctl --user show-environment 2>/dev/null |
+                grep -E "^($(echo "$ACTIVATION_VARS" | tr ' ' '|'))="
+        } >"$activation_saved.neu-$$" && mv -f "$activation_saved.neu-$$" "$activation_saved"
+    fi
+    set --
+    for var in $ACTIVATION_VARS; do
+        if value=$(session_value "$var"); then
+            set -- "$@" "$var=$value"
+        fi
+    done
+    [ $# -gt 0 ] || return 0
+    sd=ok db=ok
+    systemctl --user set-environment "$@" 2>/dev/null || sd=Fehler
+    dbus-update-activation-environment "$@" 2>/dev/null || db=Fehler
+    echo "$(date +%T.%3N) $PROGRAM: Aktivierungsumgebung gesetzt (systemd $sd, D-Bus $db): $*"
+}
+
+activation_restore() {
+    [ -f "$activation_saved" ] || return 0
+    set --
+    unset_vars=
+    for var in $ACTIVATION_VARS; do
+        session_value "$var" >/dev/null || continue
+        line=$(grep -E "^$var=" "$activation_saved" | tail -n 1)
+        if [ -n "$line" ]; then
+            set -- "$@" "$line"
+        else
+            unset_vars="$unset_vars $var"
+        fi
+    done
+    if [ $# -gt 0 ]; then
+        systemctl --user set-environment "$@" 2>/dev/null
+        dbus-update-activation-environment "$@" 2>/dev/null
+    fi
+    if [ -n "$unset_vars" ]; then
+        systemctl --user unset-environment $unset_vars 2>/dev/null
+    fi
+    rm -f "$activation_saved"
+    echo "$(date +%T.%3N) $PROGRAM: Aktivierungsumgebung zurückgesetzt: $* entfernt:${unset_vars:- nichts} (D-Bus behält entfernte Werte)"
+}
+
+# Who owns org.freedesktop.Notifications, for the log.
+notifications_owner() {
+    owner=$(busctl --user --timeout=2 call org.freedesktop.DBus /org/freedesktop/DBus \
+        org.freedesktop.DBus GetConnectionUnixProcessID s org.freedesktop.Notifications 2>/dev/null) || {
+        echo "frei"
+        return
+    }
+    pid=${owner#u }
+    echo "PID $pid ($(ps -o args= -p "$pid" 2>/dev/null | cut -c1-80))"
+}
+
+# Log files of the session; each start moves NAME.log to NAME.log.1 and so
+# on up to NAME.log.5.
+LOGS="labwc labwc-konfig panel desktop sitzung polkit-agent benachrichtigungen bildschirm sitzung-start"
+LOG_GENERATIONS=5
+rotate_logs() {
+    for log in $LOGS; do
+        f=$STATE_DIR/$log.log
+        [ -f "$f" ] || continue
+        i=$((LOG_GENERATIONS - 1))
+        while [ "$i" -ge 1 ]; do
+            if [ -f "$f.$i" ]; then
+                mv -f "$f.$i" "$f.$((i + 1))"
+            fi
+            i=$((i - 1))
+        done
+        mv -f "$f" "$f.1"
+    done
+}
+
+# Copies $1 to $2 (mode 0644) through a temporary file in the same
+# directory, so labwc never sees half a file.
+kopieren() {
+    tmp=$(dirname "$2")/.$(basename "$2").neu-$$
+    if cp -- "$1" "$tmp" && chmod 0644 "$tmp" && mv -f -- "$tmp" "$2"; then
+        return 0
+    fi
+    rm -f -- "$tmp"
+    return 1
+}
+
+# Brings the user copy of the labwc configuration up to date with the
+# defaults. .vorgabe/ in the user copy keeps the default each user file was
+# last taken from: a full copy, not only a checksum, because Querencia
+# Einstellungen merges its own settings into a newer rc.xml with it (three
+# versions: last default, user file, new default); .vorgabe/stand lists the
+# checksums, the version and the time. Per file, as far as the defaults
+# have it:
+#   user file missing                  copy the default
+#   no record yet (e.g. a file of the user or of Querencia Einstellungen
+#   before the first start)            keep the user file, record the default
+#   default unchanged since the record nothing
+#   user file equals the new default   only record it
+#   user file equals the recorded one  the user did not change it: take the
+#                                      new default, old file as FILE.vorher-ZEIT
+#   both changed                       keep the user file (a user change is
+#                                      never overwritten); the new default
+#                                      goes to FILE.vorgabe-neu
+# Prints one line per action; fails if the user copy cannot be written.
+konfig_abgleichen() {
+    basis=$BENUTZER_DIR/.vorgabe
+    mkdir -p -- "$basis" || return 1
+    zeit=$(date +%Y%m%d-%H%M%S)
+    geaendert=
+    for datei in rc.xml autostart environment menu.xml; do
+        v=$VORGABE_DIR/$datei u=$BENUTZER_DIR/$datei b=$basis/$datei
+        [ -f "$v" ] || continue
+        if [ ! -e "$u" ] && [ ! -L "$u" ]; then
+            kopieren "$v" "$u" && kopieren "$v" "$b" || return 1
+            echo "angelegt aus der Vorgabe: $u"
+        elif [ ! -f "$b" ]; then
+            kopieren "$v" "$b" || return 1
+            if cmp -s "$u" "$v"; then
+                echo "gleich der Vorgabe: $u"
+            else
+                echo "eigene Datei behalten: $u (ab jetzt Ausgangspunkt: die aktuelle Vorgabe)"
+            fi
+        elif cmp -s "$v" "$b"; then
+            continue
+        elif cmp -s "$u" "$v"; then
+            kopieren "$v" "$b" || return 1
+            rm -f -- "$u.vorgabe-neu"
+            echo "Vorgabe ist schon übernommen: $u"
+        elif cmp -s "$u" "$b"; then
+            cp -p -- "$u" "$u.vorher-$zeit" && kopieren "$v" "$u" && kopieren "$v" "$b" || return 1
+            rm -f -- "$u.vorgabe-neu"
+            echo "neue Vorgabe übernommen: $u (vorher: $u.vorher-$zeit)"
+        else
+            if ! cmp -s "$v" "$u.vorgabe-neu"; then
+                kopieren "$v" "$u.vorgabe-neu" || return 1
+            fi
+            echo "Vorgabe geändert, eigene Datei behalten: $u (neue Vorgabe: $u.vorgabe-neu)"
+            continue
+        fi
+        geaendert=ja
+    done
+    if [ -n "$geaendert" ] || [ ! -f "$basis/stand" ]; then
+        {
+            echo "# Vorgaben in .vorgabe/, zuletzt übernommen von $PROGRAM"
+            echo "zeit $(date '+%F %T')"
+            echo "quelle $VORGABE_DIR ($PROGRAM $VERSION)"
+            (cd "$basis" && for datei in rc.xml autostart environment menu.xml; do
+                if [ -f "$datei" ]; then sha256sum "$datei"; fi
+            done)
+        } >"$basis/stand.neu-$$" && mv -f -- "$basis/stand.neu-$$" "$basis/stand" || return 1
+    fi
+    return 0
 }
 
 # Value of KEY=VALUE line $2 in file $1 (quotes removed), as in
@@ -266,30 +596,76 @@ case ${1-} in
     echo "$PROGRAM: labwc ($pid) wird beendet"
     exit 0
     ;;
+--labwc-konfig-abgleichen)
+    konfig_abgleichen || die "Benutzerkopie $BENUTZER_DIR nicht beschreibbar"
+    echo "$PROGRAM: Benutzerkopie $BENUTZER_DIR abgeglichen"
+    exit 0
+    ;;
 '') ;;
-*) die "unbekannte Option: $1 (erlaubt: --check, --exit, --version)" ;;
+*) die "unbekannte Option: $1 (erlaubt: --check, --exit, --labwc-konfig-abgleichen, --version)" ;;
 esac
 
 # --- start --------------------------------------------------------------
 
-# One graphical session per user: the systemd user manager, the D-Bus
-# activation environment and the D-Bus session bus are shared per user.
 [ -z "${WAYLAND_DISPLAY-}" ] ||
     die "läuft bereits in einer Wayland-Sitzung (WAYLAND_DISPLAY=$WAYLAND_DISPLAY)"
 [ -n "${XDG_RUNTIME_DIR-}" ] || die "XDG_RUNTIME_DIR fehlt"
+
+# Logs first, so that even a refused start leaves a trace. A display
+# manager connects the starter's output to the session's VT or its journal,
+# where it mixes with everything else; so the starter's lines go to
+# sitzung-start.log, and a start from a terminal only says where.
+mkdir -p "$STATE_DIR" || die "kann $STATE_DIR nicht anlegen"
+rotate_logs
+start_log=$STATE_DIR/sitzung-start.log
+if [ -t 2 ]; then
+    echo "$PROGRAM: Protokoll in $start_log" >&2
+fi
+exec 3>&2
+stderr_saved=ja
+exec >>"$start_log" 2>&1
+for log in $LOGS; do
+    echo "# Querencia-Sitzung $(date '+%F %T'), $PROGRAM $VERSION PID $$" >>"$STATE_DIR/$log.log"
+done
+
 [ -n "${XDG_SESSION_ID-}" ] || die "keine logind-Sitzung (XDG_SESSION_ID fehlt)"
 seat=$(loginctl show-session "$XDG_SESSION_ID" -p Seat --value 2>/dev/null)
 [ -n "$seat" ] ||
     die "logind-Sitzung $XDG_SESSION_ID hat keinen Sitz; nur an einer lokalen Konsole oder über einen Anmeldebildschirm starten"
-for program in labwc querencia-panel querencia-desktop; do
+
+# One graphical session per user: the systemd user manager, the D-Bus
+# activation environment and the D-Bus session bus are shared per user. A
+# labwc here whose logind session is still there blocks the start; one
+# whose session has ended (logout without its end, e.g. a hanging labwc) is
+# a leftover and is ended.
+for p in $(pids_here labwc); do
+    sid=$(tr '\000' '\n' 2>/dev/null <"/proc/$p/environ" | sed -n 's/^XDG_SESSION_ID=//p')
+    state=$(loginctl show-session "$sid" -p State --value 2>/dev/null)
+    case $state in
+    active | online)
+        die "es läuft bereits ein labwc dieses Benutzers ($p, logind-Sitzung $sid $state; andere Sitzung aktiv?)"
+        ;;
+    esac
+    echo "$(date +%T.%3N) $PROGRAM: labwc $p gehört zu keiner laufenden Sitzung (logind-Sitzung ${sid:-?}: ${state:-weg}), Rest einer früheren Sitzung"
+    echo "$p labwc" | end_processes
+done
+# Without a labwc, every session program here is left over from an earlier
+# session (it outlived its labwc or started in a session that broke).
+leftovers=$(session_leftovers)
+if [ -n "$leftovers" ]; then
+    echo "$(date +%T.%3N) $PROGRAM: Reste einer früheren Sitzung: $(echo "$leftovers" | tr '\n' ' ')"
+    echo "$leftovers" | end_processes
+fi
+for program in $SESSION_PROGRAMS; do
     if running "$program"; then
-        die "es läuft bereits ein $program dieses Benutzers (andere Sitzung aktiv?)"
+        die "es läuft noch ein $program dieses Benutzers, das sich nicht beenden ließ"
     fi
 done
+echo "$(date +%T.%3N) $PROGRAM: org.freedesktop.Notifications: $(notifications_owner)"
 
 report=$(static_checks) || {
-    echo "$report" >&2
-    die "Sitzung wird nicht gestartet (siehe oben; Diagnose: $PROGRAM --check)"
+    echo "$report"
+    die "Sitzung wird nicht gestartet (siehe $start_log; Diagnose: $PROGRAM --check)"
 }
 [ -n "$boot_id" ] || die "Boot-ID nicht lesbar: /proc/sys/kernel/random/boot_id"
 
@@ -314,30 +690,46 @@ if [ -z "${LANG-}" ] && [ -r /etc/default/locale ]; then
     done
 fi
 
-mkdir -p "$STATE_DIR" || die "kann $STATE_DIR nicht anlegen"
-for log in labwc panel desktop sitzung polkit-agent benachrichtigungen bildschirm; do
-    if [ -f "$STATE_DIR/$log.log" ]; then
-        mv -f "$STATE_DIR/$log.log" "$STATE_DIR/$log.log.1"
-    fi
-done
-# No labwc, panel or desktop of this user runs (checked above), so older
-# records are stale.
+# Which labwc configuration: the user copy, brought up to date first; the
+# defaults if the old way is asked for or the user copy is not usable. The
+# session always starts.
+konfig_log=$STATE_DIR/labwc-konfig.log
+if [ -e "$ALTER_WEG" ]; then
+    echo "alter Weg erzwungen ($ALTER_WEG): labwc liest $VORGABE_DIR" >>"$konfig_log"
+elif konfig_abgleichen >>"$konfig_log" 2>&1 &&
+    [ -r "$BENUTZER_DIR/environment" ] && [ -r "$BENUTZER_DIR/autostart" ]; then
+    CONFIG_DIR=$BENUTZER_DIR
+else
+    echo "Benutzerkopie $BENUTZER_DIR nicht nutzbar, labwc liest $VORGABE_DIR" >>"$konfig_log"
+fi
+echo "$(date +%T.%3N) $PROGRAM: labwc-Konfiguration $CONFIG_DIR (Protokoll $konfig_log)"
+echo "labwc -C $CONFIG_DIR" >>"$konfig_log"
+# The session's locale and desktop for D-Bus activation, then fresh portals
+# (see the head of this file): a portal started from now on gets both.
+activation_export
+portals_reset "vor dem Start"
+
+# No labwc, panel or desktop of this user runs here (checked above), so
+# older records are stale.
 rm -f "$STATE_DIR/labwc.pid" "$STATE_DIR"/panel.*.pid "$STATE_DIR"/desktop.*.pid
 panel_file=$STATE_DIR/panel.$$.pid
 desktop_file=$STATE_DIR/desktop.$$.pid
 
 # Read by the autostart file (QUERENCIA_DESKTOP empty: no desktop).
+# QE_LABWC_VORGABE tells Querencia Einstellungen where the defaults are
+# (QD-063).
 export QUERENCIA_PANEL="$PANEL" QUERENCIA_STATE_DIR="$STATE_DIR" \
     QUERENCIA_PANEL_RECORD="$panel_file" \
     QUERENCIA_DESKTOP="$DESKTOP" QUERENCIA_DESKTOP_RECORD="$desktop_file" \
     QUERENCIA_SITZUNG="$SITZUNG" QUERENCIA_LEERLAUF_MINUTEN="$LEERLAUF_MINUTEN" \
     QUERENCIA_POLKIT_AGENT="$POLKIT_AGENT" \
     QUERENCIA_BENACHRICHTIGUNGEN="$BENACHRICHTIGUNGEN" \
-    QUERENCIA_EINSTELLUNGEN="$EINSTELLUNGEN"
-echo "$PROGRAM: Panel $PANEL, Arbeitsfläche ${DESKTOP:-(keine)}, Konfiguration $CONFIG_DIR"
+    QUERENCIA_EINSTELLUNGEN="$EINSTELLUNGEN" \
+    QE_LABWC_VORGABE="$VORGABE_DIR"
+echo "$(date +%T.%3N) $PROGRAM: Panel $PANEL, Arbeitsfläche ${DESKTOP:-(keine)}, Leerlaufsperre ${SITZUNG:-(keine)}, polkit-Agent ${POLKIT_AGENT:-(keiner)}"
 
 cd "$HOME" || die "kann nicht nach $HOME wechseln"
-echo "$PROGRAM: starte $LABWC ($(labwc_version)), Log $STATE_DIR/labwc.log"
+echo "$(date +%T.%3N) $PROGRAM: starte $LABWC ($(labwc_version)), Log $STATE_DIR/labwc.log"
 "$LABWC" -C "$CONFIG_DIR" </dev/null >>"$STATE_DIR/labwc.log" 2>&1 &
 labwc_pid=$!
 labwc_record=$(labwc_record_for "$labwc_pid")
@@ -363,7 +755,7 @@ leftover() {
     if [ -n "$2" ] && matches "$record" "$2"; then
         sleep 2
         if matches "$record" "$2"; then
-            echo "$PROGRAM: $3 (${record%% *}) läuft nach labwc weiter, sende SIGTERM" >&2
+            echo "$(date +%T.%3N) $PROGRAM: $3 (${record%% *}) läuft nach labwc weiter, sende SIGTERM"
             kill -TERM "${record%% *}"
         fi
     fi
@@ -371,6 +763,15 @@ leftover() {
 }
 leftover "$panel_file" "$PANEL" Panel
 leftover "$desktop_file" "$DESKTOP" Arbeitsfläche
+# Everything else this labwc started for the session (normally already
+# ended by querencia-sitzung --abmelden).
+leftovers=$(session_leftovers "$labwc_pid")
+if [ -n "$leftovers" ]; then
+    echo "$(date +%T.%3N) $PROGRAM: nach labwc noch da: $(echo "$leftovers" | tr '\n' ' ')"
+    echo "$leftovers" | end_processes
+fi
+portals_reset "nach dem Ende"
+activation_restore
 
-echo "$PROGRAM: labwc beendet mit Status $status, Logs in $STATE_DIR"
+echo "$(date +%T.%3N) $PROGRAM: labwc beendet mit Status $status, Logs in $STATE_DIR"
 exit "$status"

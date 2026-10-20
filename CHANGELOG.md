@@ -3,6 +3,33 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha4] – unveröffentlicht
+
+Sauberer Sitzungsstart und Benutzerkopie wie auf der Entwicklungs-VM (Runtime
+g2ai b10aedb = Starter 2.1, live seit 20.10.2026 14:25; Benutzerkopie G2-AG;
+labwc-Vorgabe main 1068113; G2-F3).
+
+### Hinzugefügt
+- Benutzerkopie `~/.config/querencia/labwc` mit Abgleich gegen
+  `/etc/querencia/labwc` (`.vorgabe/`, `--labwc-konfig-abgleichen`, alter Weg
+  über `~/.config/querencia/labwc-alter-weg`); `QE_LABWC_VORGABE` für
+  Querencia Einstellungen (QD-063).
+- Vor dem Start und nach dem Ende: Reste einer früheren Sitzung beenden,
+  `xdg-desktop-portal(-gtk)` stoppen (`reset-failed` davor und danach),
+  Sprache und Desktop für systemd und D-Bus setzen und wieder zurücknehmen
+  (QD-062, QD-064).
+- `autostart`: wartet höchstens 1,5 s auf das Settings-Portal, sonst starten
+  die GTK-Programme mit `GDK_DEBUG=no-portals`.
+- `/usr/share/xdg-desktop-portal/x-querencia-portals.conf` (`default=gtk;*`).
+- Logs mit fünf Generationen, eigene Zeilen mit Uhrzeit in
+  `sitzung-start.log`.
+
+### Geändert
+- `environment`: `GSK_DEBUG=full-redraw` gegen Zeichenreste von GTK 4.22
+  (QD-070).
+- Eine vollständige Benutzerkonfiguration ersetzt die Vorgabe nicht mehr
+  als Ganzes; vorhandene Dateien bleiben beim ersten Abgleich erhalten.
+
 ## [0.1.0~alpha3] – unveröffentlicht
 
 labwc-Vorgabe wie auf der Entwicklungs-VM (Runtime main 4557927, live seit
