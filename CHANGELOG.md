@@ -3,6 +3,13 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha7] – unveröffentlicht
+
+### Hinzugefügt
+- `rc.xml`: Super+D „Arbeitsfläche anzeigen“ über das Panel (D-Bus
+  `org.querencia.Panel.ArbeitsflaecheUmschalten`, QD-078, Runtime main
+  dce66e3, G2-AL); braucht `gdbus` (libglib2.0-bin).
+
 ## [0.1.0~alpha6] – unveröffentlicht
 
 ### Hinzugefügt

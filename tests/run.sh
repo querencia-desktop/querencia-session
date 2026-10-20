@@ -66,7 +66,7 @@ done
 
 # 2 version
 out=$(run sh "$S" --version)
-[ "$out" = "querencia-session 0.1.0~alpha6" ] && ok "--version" || nok "--version" "$out"
+[ "$out" = "querencia-session 0.1.0~alpha7" ] && ok "--version" || nok "--version" "$out"
 
 # 3 --check finds labwc, configuration, panel and desktop
 out=$(run sh "$S" --check); rc=$?
@@ -160,7 +160,7 @@ rm -f "$T/home/.config/querencia/session.conf"
 U=$T/home/.config/querencia/labwc
 out=$(run sh "$S" --labwc-konfig-abgleichen 2>&1); rc=$?
 [ "$rc" = 0 ] && cmp -s "$U/rc.xml" "$T/etc/querencia/labwc/rc.xml" && cmp -s "$U/.vorgabe/autostart" "$T/etc/querencia/labwc/autostart" &&
-    grep -q "querencia-session 0.1.0~alpha6" "$U/.vorgabe/stand" && ok "Abgleich legt Benutzerkopie und .vorgabe an" || nok "Abgleich anlegen" "rc=$rc $out"
+    grep -q "querencia-session 0.1.0~alpha7" "$U/.vorgabe/stand" && ok "Abgleich legt Benutzerkopie und .vorgabe an" || nok "Abgleich anlegen" "rc=$rc $out"
 echo '# eigene Zeile' >>"$U/rc.xml"
 cp "$T/etc/querencia/labwc/environment" "$T/env.orig"
 echo 'NEU=1' >>"$T/etc/querencia/labwc/environment"
@@ -194,6 +194,7 @@ for c in "/usr/bin/querencia-sitzung --sperren --sofort" "/usr/bin/querencia-sit
     grep -q "command=\"$c\"" "$ROOT/labwc/rc.xml" && ok "rc.xml: $c" || nok "rc.xml: $c"
 done
 grep -q '<name>Querencia-Klassisch</name>' "$ROOT/labwc/rc.xml" && ok "rc.xml: Theme Querencia-Klassisch" || nok "rc.xml: Theme"
+grep -A2 '<keybind key="W-d">' "$ROOT/labwc/rc.xml" | grep -q 'org.querencia.Panel.ArbeitsflaecheUmschalten' && ok "rc.xml: W-d Arbeitsfläche anzeigen (QD-078)" || nok "rc.xml: W-d"
 for k in W-f A-F11; do
     grep -A1 "<keybind key=\"$k\">" "$ROOT/labwc/rc.xml" | grep -q 'ToggleFullscreen' && ok "rc.xml: $k Vollbild (QD-065)" || nok "rc.xml: $k Vollbild"
 done

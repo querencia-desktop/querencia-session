@@ -4,7 +4,7 @@ Sitzungsstart von [Querencia Desktop](../querencia/README.md): der Starter
 `querencia-session`, die labwc-Konfiguration der Sitzung und die
 Wayland-Sitzungsdatei für Anmeldebildschirme.
 
-> **Status: Alpha (0.1.0~alpha6).** Auf der Entwicklungs-VM läuft noch der
+> **Status: Alpha (0.1.0~alpha7).** Auf der Entwicklungs-VM läuft noch der
 > Entwicklungsstarter (`herkunft/`). Der portable Stand hier ist mit
 > `tests/run.sh` geprüft, aber **noch nicht in einer echten Anmeldung**.
 

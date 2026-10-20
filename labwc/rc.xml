@@ -58,6 +58,14 @@
     <keybind key="A-F11">
       <action name="ToggleFullscreen" />
     </keybind>
+    <!-- Super+D like the "show desktop" button at the left of the bottom
+         panel (QD-078): minimises all windows of the current workspace, the
+         next press restores exactly these. The panel does both (D-Bus at its
+         bus name); without a running panel the shortcut does nothing. -->
+    <keybind key="W-d">
+      <action name="Execute"
+              command="gdbus call --session --dest org.example.Querencia.Panel --object-path /org/example/Querencia/Panel --method org.querencia.Panel.ArbeitsflaecheUmschalten" />
+    </keybind>
     <!-- Querencia Sitzung (package querencia-sitzung): Ctrl+Alt+L locks the
          screen at once (ext-session-lock, as GNOME 2), Ctrl+Alt+Delete
          opens the session dialog (Abmelden, Bildschirm sperren, Neu
