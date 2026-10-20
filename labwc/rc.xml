@@ -46,6 +46,18 @@
     <keybind key="C-A-S-Right">
       <action name="SendToDesktop" to="right" follow="yes" wrap="no" />
     </keybind>
+    <!-- Fullscreen on/off for the active window (QD-065), also for programs
+         without a fullscreen shortcut of their own, e.g. Xwayland programs
+         that only draw a screen-sized window: in fullscreen labwc hides the
+         panels. Super+F and Alt+F11 instead of F11, because labwc shortcuts
+         come before every program: F11 would no longer reach Firefox, Files
+         or a remote session. -->
+    <keybind key="W-f">
+      <action name="ToggleFullscreen" />
+    </keybind>
+    <keybind key="A-F11">
+      <action name="ToggleFullscreen" />
+    </keybind>
     <!-- Querencia Sitzung (package querencia-sitzung): Ctrl+Alt+L locks the
          screen at once (ext-session-lock, as GNOME 2), Ctrl+Alt+Delete
          opens the session dialog (Abmelden, Bildschirm sperren, Neu

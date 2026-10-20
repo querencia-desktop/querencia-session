@@ -60,7 +60,7 @@
 set -u
 
 PROGRAM=querencia-session
-VERSION=0.1.0~alpha5
+VERSION=0.1.0~alpha6
 # labwc 0.9.3 (Ubuntu 26.04) gives open panel menus no keyboard focus; see
 # docs/TROUBLESHOOTING.md in the querencia repository.
 LABWC_MIN=0.9.4

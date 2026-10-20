@@ -3,6 +3,12 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha6] – unveröffentlicht
+
+### Hinzugefügt
+- `rc.xml`: Super+F und Alt+F11 schalten Vollbild für das aktive Fenster um
+  (QD-065, Runtime main 548483c, G2-AK).
+
 ## [0.1.0~alpha5] – unveröffentlicht
 
 ### Geändert
