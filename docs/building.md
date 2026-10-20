@@ -3,7 +3,7 @@
 Es gibt nichts zu übersetzen (POSIX-Shell-Skripte und Konfiguration).
 
 ```bash
-make check                          # Testsuite, siehe TESTING.md
+make check                          # Testsuite, siehe docs/testing.md
 make install DESTDIR=/tmp/stage     # Probeinstallation in einen Ordner
 ```
 

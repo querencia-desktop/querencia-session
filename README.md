@@ -48,7 +48,7 @@ Abmelden: Menü „System → Abmelden …“ (Panel, `labwc --exit`) oder
 
 ## Bauen, testen, installieren
 
-Siehe [BUILDING.md](BUILDING.md) und [TESTING.md](TESTING.md).
+Siehe [docs/building.md](docs/building.md) und [docs/testing.md](docs/testing.md).
 
 ## Lizenz
 
