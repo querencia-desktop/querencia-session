@@ -3,6 +3,18 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha3] – unveröffentlicht
+
+labwc-Vorgabe wie auf der Entwicklungs-VM (Runtime main 4557927, live seit
+20.10.2026 11:28; G2-F2).
+
+### Geändert
+- `rc.xml`: Symbolthema Querencia statt gnome-human (ohne Rückfall, wenn
+  das Thema fehlt: das Paket hängt deshalb von querencia-symbole ab);
+  Schriften DejaVu Sans 10, Fenstertitel und Menüüberschrift fett;
+  `iconPriority="client"` für Einstellungen, Editor und Systemmonitor.
+- `environment`: Zeiger DMZ-White 24 (`XCURSOR_THEME`, `XCURSOR_SIZE`).
+
 ## [0.1.0~alpha2] – unveröffentlicht
 
 Live-Stand der Entwicklungs-VM vom 20.10.2026, portabel (G2-F).

@@ -74,6 +74,14 @@
     <windowRule identifier="org.querencia.PolkitAgent*" skipTaskbar="yes" skipWindowSwitcher="yes">
       <action name="AutoPlace" policy="center" />
     </windowRule>
+    <!-- These programs embed their own window icon: the title bar shows it
+         instead of the icon theme's guess (live default since 20.10.). -->
+    <windowRule identifier="org.querencia.Einstellungen" iconPriority="client" />
+    <windowRule identifier="querencia-einstellungen" iconPriority="client" />
+    <windowRule identifier="org.querencia.Editor" iconPriority="client" />
+    <windowRule identifier="querencia-editor" iconPriority="client" />
+    <windowRule identifier="org.querencia.Systemmonitor" iconPriority="client" />
+    <windowRule identifier="querencia-systemmonitor" iconPriority="client" />
   </windowRules>
 
   <!-- Alt+Tab: list ("classic") with icon, title and workspace, only on
@@ -90,15 +98,39 @@
   </windowSwitcher>
 
   <!-- Window theme Querencia-Klassisch (package querencia-shell,
-       /usr/share/themes/Querencia-Klassisch/labwc); icon theme gnome-human
-       (PNG icons as in GNOME 2; package gnome-human-icon-theme, recommended).
-       Without the theme labwc falls back to its built-in one. -->
+       /usr/share/themes/Querencia-Klassisch/labwc); icon theme Querencia
+       (package querencia-symbole, /usr/share/icons/Querencia, inheriting
+       from gnome-human and hicolor). Without the window theme labwc falls
+       back to its built-in one; without the icon theme Querencia there is
+       NO fallback (labwc 0.9.8 knows the inheritance only from its
+       index.theme) and title bars stay without icons, so the session
+       package depends on querencia-symbole. Fonts: DejaVu Sans 10, title
+       and menu header bold (package fonts-dejavu). -->
   <theme>
     <name>Querencia-Klassisch</name>
-    <icon>gnome-human</icon>
+    <icon>Querencia</icon>
+    <font place="ActiveWindow">
+      <name>DejaVu Sans</name>
+      <size>10</size>
+      <weight>bold</weight>
+    </font>
+    <font place="InactiveWindow">
+      <name>DejaVu Sans</name>
+      <size>10</size>
+      <weight>bold</weight>
+    </font>
+    <font place="MenuHeader">
+      <name>DejaVu Sans</name>
+      <size>10</size>
+      <weight>bold</weight>
+    </font>
+    <font place="MenuItem">
+      <name>DejaVu Sans</name>
+      <size>10</size>
+    </font>
     <font place="OnScreenDisplay">
-      <name>Adwaita Sans</name>
-      <size>11</size>
+      <name>DejaVu Sans</name>
+      <size>10</size>
     </font>
   </theme>
 </labwc_config>

@@ -15,3 +15,8 @@
 XDG_SESSION_TYPE=wayland
 XDG_CURRENT_DESKTOP=X-Querencia
 XDG_SESSION_DESKTOP=querencia
+
+# Mouse pointer of the session (package dmz-cursor-theme), also for
+# Xwayland and programs that do not read gsettings.
+XCURSOR_THEME=DMZ-White
+XCURSOR_SIZE=24

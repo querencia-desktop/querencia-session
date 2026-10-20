@@ -41,7 +41,7 @@ done
 
 # 2 version
 out=$(run sh "$S" --version)
-[ "$out" = "querencia-session 0.1.0~alpha2" ] && ok "--version" || nok "--version" "$out"
+[ "$out" = "querencia-session 0.1.0~alpha3" ] && ok "--version" || nok "--version" "$out"
 
 # 3 --check finds labwc, configuration, panel and desktop
 out=$(run sh "$S" --check); rc=$?
