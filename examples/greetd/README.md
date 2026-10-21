@@ -8,13 +8,13 @@ Desktop“ dann zur Auswahl an. Ein bereits eingerichteter Anmeldebildschirm
 bleibt unverändert.
 
 Wer greetd neu einrichten will, tut das als **eigenen, bewussten Schritt**
-(siehe `docs/INSTALLATION.md` im Repository `querencia`, Abschnitt
-„Anmeldebildschirm“):
+(fertig eingerichtet liefert das Paket `querencia-anmeldung` greetd mit
+ReGreet, siehe Repository `querencia-anmeldung`):
 
 - `config.toml.tuigreet` – nur Pakete aus Ubuntu (`greetd`, `tuigreet`).
 - `config.toml.regreet` – grafischer Greeter ReGreet in `cage`; ReGreet ist
-  **nicht** in Ubuntu 26.04 enthalten (auf der Entwicklungs-VM ein Eigenbau
-  unter `/usr/local/bin/regreet`).
+  **nicht** in Ubuntu 26.04 enthalten (das Paket `querencia-anmeldung`
+  bringt ihn mit).
 
 Vor dem Aktivieren prüfen, dass eine lokale grafische Ausgabe existiert
 (`ls /dev/dri/card*`), sonst startet der grafische Greeter nicht. Eine

@@ -1,5 +1,5 @@
 # Beispiel für /etc/greetd/config.toml – NICHT automatisch installiert.
-# Grafischer Greeter ReGreet in cage (so auf der Entwicklungs-VM eingerichtet).
+# Grafischer Greeter ReGreet in cage.
 # ReGreet ist nicht in Ubuntu 26.04 enthalten und muss separat bereitgestellt
 # werden; cage kommt aus Ubuntu (Paket cage).
 [terminal]

@@ -19,6 +19,5 @@ fünf Log-Generationen. `systemctl`, `busctl`, `loginctl` und
 `dbus-update-activation-environment` sind dabei Attrappen, die nur
 mitschreiben; der echte User-Manager wird nie angesprochen.
 
-Nicht abgedeckt (braucht eine echte Anmeldung, siehe `docs/TESTING.md` im
-Repository `querencia`): Start des echten labwc, Panel und Desktop,
-Abmelden, Aufräumen übrig gebliebener Prozesse, echte Portale.
+Nicht abgedeckt (braucht eine echte Anmeldung, geprüft in einer Test-VM):
+Start des echten labwc, Panel und Desktop, Abmelden, Aufräumen übrig gebliebener Prozesse, echte Portale.

@@ -1,9 +1,11 @@
 # Querencia Session
 
-Sitzungsstart von [Querencia Desktop](https://github.com/querencia-desktop/querencia)
+Sitzungsstart von [Querencia Desktop](https://querencialinux.org)
 – einer klassischen Desktopumgebung im GNOME-2-Stil für Wayland (labwc, Rust,
 GTK 4): der Starter `querencia-session`, die labwc-Konfiguration der Sitzung und
 die Wayland-Sitzungsdatei für Anmeldebildschirme.
+Installiert wird es zusammen mit Querencia Desktop aus der APT-Quelle;
+Anleitung auf <https://querencialinux.org>.
 
 *English summary:* Session start of Querencia Desktop: the `querencia-session`
 launcher, the labwc configuration of the session and the Wayland session file
@@ -55,7 +57,7 @@ Abmelden: Menü „System → Abmelden …“ (Panel, `labwc --exit`) oder
 `querencia-session --exit` aus einer anderen Shell desselben Benutzers.
 Nach dem Ende von labwc stoppt der Starter die Portale wieder und setzt die
 Aktivierungsumgebung zurück, damit eine sofortige Neuanmeldung frische
-Portale bekommt (QD-062).
+Portale bekommt.
 
 ## Abhängigkeiten
 

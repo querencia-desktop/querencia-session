@@ -3,43 +3,39 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
-## [0.1.0~alpha7] – unveröffentlicht
+## [0.1.0~alpha7] – 2026-10-21
 
 ### Hinzugefügt
 - `rc.xml`: Super+D „Arbeitsfläche anzeigen“ über das Panel (D-Bus
-  `org.querencia.Panel.ArbeitsflaecheUmschalten`, QD-078, Runtime main
-  dce66e3, G2-AL); braucht `gdbus` (libglib2.0-bin).
+  `org.querencia.Panel.ArbeitsflaecheUmschalten`); braucht `gdbus` (libglib2.0-bin).
 
 ## [0.1.0~alpha6] – unveröffentlicht
 
 ### Hinzugefügt
-- `rc.xml`: Super+F und Alt+F11 schalten Vollbild für das aktive Fenster um
-  (QD-065, Runtime main 548483c, G2-AK).
+- `rc.xml`: Super+F und Alt+F11 schalten Vollbild für das aktive Fenster um.
 
 ## [0.1.0~alpha5] – unveröffentlicht
 
 ### Geändert
 - `x-querencia-portals.conf`: `default=gtk` und
-  `org.freedesktop.impl.portal.Secret=gnome-keyring` statt `default=gtk;*`
-  (QD-077): mit `*` zog xdg-desktop-portal auf Ubuntu Desktop auch
+  `org.freedesktop.impl.portal.Secret=gnome-keyring` statt `default=gtk;*`:
+  mit `*` zog xdg-desktop-portal auf Ubuntu Desktop auch
   xdg-desktop-portal-gnome heran, das außerhalb von GNOME rund zwei Minuten
   hängt.
 
 ## [0.1.0~alpha4] – unveröffentlicht
 
-Sauberer Sitzungsstart und Benutzerkopie wie auf der Entwicklungs-VM (Runtime
-g2ai b10aedb = Starter 2.1, live seit 20.10.2026 14:25; Benutzerkopie G2-AG;
-labwc-Vorgabe main 1068113; G2-F3).
+Sauberer Sitzungsstart und Benutzerkopie wie in der Entwicklungsumgebung
+(Starter 2.1, Stand 20.10.2026).
 
 ### Hinzugefügt
 - Benutzerkopie `~/.config/querencia/labwc` mit Abgleich gegen
   `/etc/querencia/labwc` (`.vorgabe/`, `--labwc-konfig-abgleichen`, alter Weg
   über `~/.config/querencia/labwc-alter-weg`); `QE_LABWC_VORGABE` für
-  Querencia Einstellungen (QD-063).
+  Querencia Einstellungen.
 - Vor dem Start und nach dem Ende: Reste einer früheren Sitzung beenden,
   `xdg-desktop-portal(-gtk)` stoppen (`reset-failed` davor und danach),
-  Sprache und Desktop für systemd und D-Bus setzen und wieder zurücknehmen
-  (QD-062, QD-064).
+  Sprache und Desktop für systemd und D-Bus setzen und wieder zurücknehmen.
 - `autostart`: wartet höchstens 1,5 s auf das Settings-Portal, sonst starten
   die GTK-Programme mit `GDK_DEBUG=no-portals`.
 - `/usr/share/xdg-desktop-portal/x-querencia-portals.conf` (`default=gtk;*`).
@@ -47,15 +43,13 @@ labwc-Vorgabe main 1068113; G2-F3).
   `sitzung-start.log`.
 
 ### Geändert
-- `environment`: `GSK_DEBUG=full-redraw` gegen Zeichenreste von GTK 4.22
-  (QD-070).
+- `environment`: `GSK_DEBUG=full-redraw` gegen Zeichenreste von GTK 4.22.
 - Eine vollständige Benutzerkonfiguration ersetzt die Vorgabe nicht mehr
   als Ganzes; vorhandene Dateien bleiben beim ersten Abgleich erhalten.
 
 ## [0.1.0~alpha3] – unveröffentlicht
 
-labwc-Vorgabe wie auf der Entwicklungs-VM (Runtime main 4557927, live seit
-20.10.2026 11:28; G2-F2).
+labwc-Vorgabe wie in der Entwicklungsumgebung (Stand 20.10.2026).
 
 ### Geändert
 - `rc.xml`: Symbolthema Querencia statt gnome-human (ohne Rückfall, wenn
@@ -68,7 +62,7 @@ labwc-Vorgabe wie auf der Entwicklungs-VM (Runtime main 4557927, live seit
 
 ## [0.1.0~alpha2] – unveröffentlicht
 
-Live-Stand der Entwicklungs-VM vom 20.10.2026, portabel (G2-F).
+Stand der Entwicklungsumgebung vom 20.10.2026, portabel.
 
 ### Hinzugefügt
 - autostart startet, wenn installiert: polkit-Agent und Leerlaufsperre
@@ -90,7 +84,7 @@ Live-Stand der Entwicklungs-VM vom 20.10.2026, portabel (G2-F).
 
 ## [0.1.0~alpha1] – unveröffentlicht
 
-Erster portabler Stand (QREL-01).
+Erster portabler Stand.
 
 ### Hinzugefügt
 - `querencia-session --check` (Diagnose ohne Start) und `--version`.
