@@ -14,7 +14,7 @@
 #                              the session labwc --reconfigure reloads it
 #   querencia-session --version
 #
-# Portable successor of the development starter (herkunft/session/): no
+# Portable successor of the development starter: no
 # fixed home or project paths, labwc from PATH, configuration defaults from
 # /etc/querencia/labwc.
 #

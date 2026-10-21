@@ -104,7 +104,7 @@ Erster portabler Stand (QREL-01).
 - Testsuite `tests/run.sh` (läuft ohne Sitzung, startet nie labwc).
 - Beispiele für greetd (tuigreet, ReGreet), nicht aktiviert.
 
-### Geändert (gegenüber dem Entwicklungsstarter in `herkunft/`)
+### Geändert (gegenüber dem Entwicklungsstarter)
 - labwc aus `PATH` (Mindestversion 0.9.4) statt fest `~/opt/labwc-0.9.8`.
 - Programme aus `/usr/bin` statt aus Cargo-`target`-Verzeichnissen.
 - Konfiguration aus `/etc/querencia/labwc` bzw. `~/.config/querencia/labwc`

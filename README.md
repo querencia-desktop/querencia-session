@@ -1,12 +1,17 @@
 # Querencia Session
 
-Sitzungsstart von [Querencia Desktop](../querencia/README.md): der Starter
-`querencia-session`, die labwc-Konfiguration der Sitzung und die
-Wayland-Sitzungsdatei für Anmeldebildschirme.
+Sitzungsstart von [Querencia Desktop](https://github.com/querencia-desktop/querencia)
+– einer klassischen Desktopumgebung im GNOME-2-Stil für Wayland (labwc, Rust,
+GTK 4): der Starter `querencia-session`, die labwc-Konfiguration der Sitzung und
+die Wayland-Sitzungsdatei für Anmeldebildschirme.
 
-> **Status: Alpha (0.1.0~alpha7).** Auf der Entwicklungs-VM läuft noch der
-> Entwicklungsstarter (`herkunft/`). Der portable Stand hier ist mit
-> `tests/run.sh` geprüft, aber **noch nicht in einer echten Anmeldung**.
+*English summary:* Session start of Querencia Desktop: the `querencia-session`
+launcher, the labwc configuration of the session and the Wayland session file
+for login screens. Alpha software; documentation is in German.
+
+> **Alpha (0.1.0~alpha7, Tag `session/0.1.0-alpha7`).** Geprüft mit
+> `tests/run.sh`; als Debian-Paket `querencia-session` Teil von Alpha 1 und
+> Alpha 2. Keine Sicherheits- oder Datenverlustgarantie.
 
 ## Was installiert wird
 
@@ -56,7 +61,8 @@ Portale bekommt (QD-062).
 
 `labwc (>= 0.9.4)`, `querencia-shell`, `procps` (`pgrep`, `ps`),
 `systemd` (`loginctl`), `dbus-user-session`. Ubuntu 26.04 liefert labwc
-0.9.3 – siehe `docs/TROUBLESHOOTING.md` im Repository `querencia`.
+0.9.3; die APT-Quelle von Querencia liefert labwc 0.9.8 mit (Paketierung in
+`querencia-packaging`).
 
 ## Bauen, testen, installieren
 
@@ -66,3 +72,9 @@ Siehe [docs/building.md](docs/building.md) und [docs/testing.md](docs/testing.md
 
 GPL-3.0-or-later (wie `querencia-shell`, aus dem die Sitzungsdateien
 stammen), siehe [LICENSE](LICENSE).
+
+## Fehler melden
+
+Fehler, Wünsche und Fragen zu Querencia gehen an die gemeinsame Meldestelle:
+<https://github.com/querencia-desktop/querencia/issues/new/choose>.
+Sicherheitslücken bitte nicht öffentlich melden, siehe [SECURITY.md](SECURITY.md).

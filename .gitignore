@@ -2,3 +2,6 @@
 *.swp
 *~
 /debian/
+# Ausgaben der isolierten Prüfung (nicht einchecken)
+/target
+/nachweis/
