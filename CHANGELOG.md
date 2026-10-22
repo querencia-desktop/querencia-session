@@ -6,6 +6,13 @@ nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 ## [0.1.0~alpha7] – unveröffentlicht
 
 ### Hinzugefügt
+- `autostart`: Das Panel startet unter seiner Überwachung
+  (`querencia-panel --ueberwacht`), wenn es das kann (`--faehigkeiten` nennt
+  „ueberwacht“, ab Panel 0.2.3). Stürzt das Panel ab, startet die Überwachung
+  es neu, höchstens dreimal in zehn Minuten. Ein älteres Panel startet wie
+  bisher. Der Block ist gleich der labwc-Vorgabe von querencia-runtime.
+- Tests: Das Fake-Panel beantwortet `--faehigkeiten`; geprüft werden der Start
+  unter Überwachung und der Start eines älteren Panels ohne sie.
 - `rc.xml`: Super+D „Arbeitsfläche anzeigen“ über das Panel (D-Bus
   `org.querencia.Panel.ArbeitsflaecheUmschalten`, QD-078, Runtime main
   dce66e3, G2-AL); braucht `gdbus` (libglib2.0-bin).
