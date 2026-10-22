@@ -61,10 +61,12 @@
     <!-- Super+D like the "show desktop" button at the left of the bottom
          panel (QD-078): minimises all windows of the current workspace, the
          next press restores exactly these. The panel does both (D-Bus at its
-         bus name); without a running panel the shortcut does nothing. -->
+         bus name org.querencia.Panel, from Panel 0.2.4; until 0.2.3
+         org.example.Querencia.Panel, which newer panels still answer to);
+         without a running panel the shortcut does nothing. -->
     <keybind key="W-d">
       <action name="Execute"
-              command="gdbus call --session --dest org.example.Querencia.Panel --object-path /org/example/Querencia/Panel --method org.querencia.Panel.ArbeitsflaecheUmschalten" />
+              command="gdbus call --session --dest org.querencia.Panel --object-path /org/querencia/Panel --method org.querencia.Panel.ArbeitsflaecheUmschalten" />
     </keybind>
     <!-- Querencia Sitzung (package querencia-sitzung): Ctrl+Alt+L locks the
          screen at once (ext-session-lock, as GNOME 2), Ctrl+Alt+Delete

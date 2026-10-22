@@ -3,7 +3,9 @@
 # (GNOME, KDE, …) are not affected; the user's ~/.config/mimeapps.list
 # always wins.
 [Default Applications]
-inode/directory=io.github.lgse.Strata.desktop
+# Folders with Querencia Files (application ID org.querencia.Files; the old
+# io.github.lgse.Strata.desktop is a hidden bridge without MIME types).
+inode/directory=org.querencia.Files.desktop
 # Texte und Bilder wie auf der Entwicklungs-VM (Editor 0.2.0, Bilder 0.1.1);
 # fehlt ein Programm, nimmt GIO das nächste passende.
 text/plain=org.querencia.Editor.desktop

@@ -3,6 +3,18 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha8] – unveröffentlicht
+
+### Geändert
+- `rc.xml`: Super+D ruft das Panel unter seinem neuen Namen
+  `org.querencia.Panel` (Pfad `/org/querencia/Panel`, ab Panel 0.2.4) auf.
+  Neuere Panels antworten auch noch unter dem alten Namen.
+- `x-querencia-mimeapps.list`: Ordner öffnen mit `org.querencia.Files.desktop`
+  (neue Kennung von Querencia Files); der alte Starter
+  `io.github.lgse.Strata.desktop` bleibt nur als unsichtbare Brücke und nennt
+  keine MIME-Typen mehr.
+- Tests prüfen Busname und Pfad von Super+D und die Ordnerzuordnung.
+
 ## [0.1.0~alpha7] – unveröffentlicht
 
 ### Hinzugefügt
