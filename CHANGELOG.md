@@ -3,6 +3,19 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
+## [0.1.0~alpha9] – unveröffentlicht
+
+### Geändert
+- `x-querencia-mimeapps.list`: Ordner öffnen mit `org.querencia.Dateien.desktop`
+  (Querencia Dateien löst Querencia Files als Ordnerprogramm ab, Migration M2,
+  Welle C). Die Starter von Files bleiben eine Ausgabe lang unsichtbare
+  Brücken auf Dateien ohne MIME-Typen; die Benutzer-`mimeapps.list` gewinnt
+  weiterhin. Übernommen aus dem Packaging-Patch 0002
+  (querencia-session 0.1.0~alpha8-2).
+- `rc.xml`: Der Kommentar zu Super+F/Alt+F11 nennt kein bestimmtes
+  Dateiprogramm mehr; die Tastenbelegung ist unverändert.
+- Tests prüfen die Ordnerzuordnung auf `org.querencia.Dateien.desktop`.
+
 ## [0.1.0~alpha8] – unveröffentlicht
 
 ### Geändert

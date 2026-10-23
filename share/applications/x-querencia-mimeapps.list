@@ -3,9 +3,11 @@
 # (GNOME, KDE, …) are not affected; the user's ~/.config/mimeapps.list
 # always wins.
 [Default Applications]
-# Folders with Querencia Files (application ID org.querencia.Files; the old
-# io.github.lgse.Strata.desktop is a hidden bridge without MIME types).
-inode/directory=org.querencia.Files.desktop
+# Folders with Querencia Dateien (application ID org.querencia.Dateien). The
+# starters of Querencia Files (org.querencia.Files.desktop and the old
+# io.github.lgse.Strata.desktop) are hidden bridges to Querencia Dateien
+# without MIME types for one release.
+inode/directory=org.querencia.Dateien.desktop
 # Texte und Bilder wie auf der Entwicklungs-VM (Editor 0.2.0, Bilder 0.1.1);
 # fehlt ein Programm, nimmt GIO das nächste passende.
 text/plain=org.querencia.Editor.desktop
