@@ -7,13 +7,9 @@ die Wayland-Sitzungsdatei für Anmeldebildschirme.
 Installiert wird es zusammen mit Querencia Desktop aus der APT-Quelle;
 Anleitung auf <https://querencialinux.org>.
 
-*English summary:* Session start of Querencia Desktop: the `querencia-session`
-launcher, the labwc configuration of the session and the Wayland session file
-for login screens. Alpha software; documentation is in German.
-
-> **Alpha (0.1.0~alpha7-3, Tag `session/alpha7-3`; das Panel startet unter seiner
-> Überwachung).** Geprüft mit `tests/run.sh`; als Debian-Paket `querencia-session`
-> Teil von Alpha 1, Alpha 2 und Alpha 2.1. Keine Sicherheits- oder Datenverlustgarantie.
+> **Status: Alpha (0.1.0~alpha10).** Auf der Entwicklungs-VM läuft noch der
+> Entwicklungsstarter (`herkunft/`). Der portable Stand hier ist mit
+> `tests/run.sh` geprüft, aber **noch nicht in einer echten Anmeldung**.
 
 ## Was installiert wird
 
@@ -41,8 +37,10 @@ liegt dann als `<datei>.vorgabe-neu` daneben). Mit der Datei
 Anmeldebildschirm / Konsole
   └─ querencia-session            beendet Reste einer früheren Sitzung; prüft: keine andere
      │                            Sitzung, logind-Sitz, labwc ≥ 0.9.4, Vorgabe, querencia-panel;
+     │                            prüft bei nouveau im Hintergrund den OpenGL-Renderer;
      │                            setzt Tastatur/Sprache, gleicht die Benutzerkopie ab, gibt
-     │                            Sprache und Desktop an systemd/D-Bus, stoppt die Portale
+     │                            Sprache und Desktop (bei zink auf NVK Software-OpenGL) an
+     │                            systemd/D-Bus, stoppt die Portale
      └─ labwc -C ~/.config/querencia/labwc   (alter Weg: /etc/querencia/labwc)
         └─ autostart  ─ wartet höchstens 1,5 s auf das Settings-Portal
                       ─ querencia-polkit-agent         Passwortdialog für polkit (optional)
@@ -59,12 +57,19 @@ Nach dem Ende von labwc stoppt der Starter die Portale wieder und setzt die
 Aktivierungsumgebung zurück, damit eine sofortige Neuanmeldung frische
 Portale bekommt.
 
+Mit dem freien NVIDIA-Treiber (nouveau, OpenGL als zink auf NVK) bekommen
+die Programme der Sitzung Software-OpenGL (llvmpipe), labwc selbst nicht;
+Einstellung `~/.config/querencia/grafik.ini`, Diagnose
+`querencia-session --grafik-pruefen`. Siehe
+[docs/sitzung-grafik.md](docs/sitzung-grafik.md).
+
 ## Abhängigkeiten
 
 `labwc (>= 0.9.4)`, `querencia-shell`, `procps` (`pgrep`, `ps`),
-`systemd` (`loginctl`), `dbus-user-session`. Ubuntu 26.04 liefert labwc
-0.9.3; die APT-Quelle von Querencia liefert labwc 0.9.8 mit (Paketierung in
-`querencia-packaging`).
+`systemd` (`loginctl`), `dbus-user-session`; für die Renderer-Prüfung
+`querencia-sitzung` ab 0.1.8 oder `mesa-utils` (`eglinfo`), sonst bleibt
+OpenGL unverändert. Ubuntu 26.04 liefert labwc
+0.9.3 – siehe `docs/TROUBLESHOOTING.md` im Repository `querencia`.
 
 ## Bauen, testen, installieren
 

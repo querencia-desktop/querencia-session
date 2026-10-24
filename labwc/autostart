@@ -5,6 +5,18 @@
 : "${QUERENCIA_STATE_DIR:?nur über querencia-session starten}"
 : "${QUERENCIA_PANEL_RECORD:?nur über querencia-session starten}"
 
+# Software OpenGL (QD-169): if the renderer is zink on NVK (nouveau),
+# querencia-session passes LIBGL_ALWAYS_SOFTWARE=1,
+# MESA_LOADER_DRIVER_OVERRIDE=llvmpipe and GALLIUM_DRIVER=llvmpipe here; they
+# apply to everything this script starts and to what panel and desktop
+# start. labwc itself keeps zink. Only these three names; empty: nothing
+# (docs/sitzung-grafik.md).
+for zuweisung in ${QUERENCIA_GRAFIK_UMGEBUNG-}; do
+    case $zuweisung in
+    LIBGL_ALWAYS_SOFTWARE=* | MESA_LOADER_DRIVER_OVERRIDE=* | GALLIUM_DRIVER=*) export "$zuweisung" ;;
+    esac
+done
+
 # Settings portal guard (QD-062). GTK 4 asks
 # org.freedesktop.portal.Settings while it starts and waits up to 25 s per
 # call for an answer; a portal left over from an earlier session kept panel

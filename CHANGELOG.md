@@ -3,7 +3,63 @@
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen
 nach [SemVer](https://semver.org/lang/de/) mit Vorabkennung.
 
-## [0.1.0~alpha7] – 2026-10-21
+## [0.1.0~alpha10] – unveröffentlicht
+
+### Hinzugefügt
+- Software-OpenGL bei zink auf NVK (QD-169), übernommen aus dem
+  Entwicklungsstarter (querencia-runtime `session/grafik-1`): Hat ein
+  Render-Knoten den Kerneltreiber `nouveau`, fragt `querencia-session` vor
+  labwc im Hintergrund den OpenGL-Renderer ab (`querencia-sitzung
+  --grafik-pruefen`, sonst `eglinfo -B -p surfaceless -a gles`) und wartet
+  höchstens 2 s darauf, nie auf den Prozess selbst. Meldet er zink auf NVK
+  oder nouveau, bekommen die Programme der Sitzung
+  `LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+  GALLIUM_DRIVER=llvmpipe`: über `autostart` (`QUERENCIA_GRAFIK_UMGEBUNG`)
+  und in der Aktivierungsumgebung von systemd und D-Bus, mit Rücknahme am
+  Ende. labwc selbst bekommt sie nicht; Vulkan bleibt unberührt. Andere
+  Treiber: keine Prüfung, nichts gesetzt.
+- `~/.config/querencia/grafik.ini`, `[Grafik] Software-OpenGL =
+  automatisch|an|aus`, übersteuert die Prüfung.
+- `querencia-session --grafik-pruefen`: zeigt die Entscheidung, ohne etwas
+  zu starten oder zu ändern. Eine Zeile „Grafik: …“ in `sitzung-start.log`.
+- `docs/sitzung-grafik.md`.
+- Tests mit Attrappen für Render-Knoten, `eglinfo` und `querencia-sitzung`:
+  zink/NVK, andere Treiber, zwei Karten, Hänger über die Zeitgrenze,
+  `grafik.ini`, Autostart, ganze Starts (labwc ohne, Panel mit den
+  Variablen).
+
+### Geändert
+- `autostart` (Conffile): exportiert genau die drei Namen aus
+  `QUERENCIA_GRAFIK_UMGEBUNG`.
+- `x-querencia-mimeapps.list`, CHANGELOG 0.1.0~alpha9: Der Kommentar zu den
+  Files-Startern nennt keine Frist mehr.
+
+## [0.1.0~alpha9] – unveröffentlicht
+
+### Geändert
+- `x-querencia-mimeapps.list`: Ordner öffnen mit `org.querencia.Dateien.desktop`
+  (Querencia Dateien löst Querencia Files als Ordnerprogramm ab, Migration M2,
+  Welle C). Den Übergang der Starter von Files regelt das Paket
+  querencia-files bzw. querencia-dateien; die Benutzer-`mimeapps.list`
+  gewinnt weiterhin. Übernommen aus dem Packaging-Patch 0002
+  (querencia-session 0.1.0~alpha8-2).
+- `rc.xml`: Der Kommentar zu Super+F/Alt+F11 nennt kein bestimmtes
+  Dateiprogramm mehr; die Tastenbelegung ist unverändert.
+- Tests prüfen die Ordnerzuordnung auf `org.querencia.Dateien.desktop`.
+
+## [0.1.0~alpha8] – unveröffentlicht
+
+### Geändert
+- `rc.xml`: Super+D ruft das Panel unter seinem neuen Namen
+  `org.querencia.Panel` (Pfad `/org/querencia/Panel`, ab Panel 0.2.4) auf.
+  Neuere Panels antworten auch noch unter dem alten Namen.
+- `x-querencia-mimeapps.list`: Ordner öffnen mit `org.querencia.Files.desktop`
+  (neue Kennung von Querencia Files); der alte Starter
+  `io.github.lgse.Strata.desktop` bleibt nur als unsichtbare Brücke und nennt
+  keine MIME-Typen mehr.
+- Tests prüfen Busname und Pfad von Super+D und die Ordnerzuordnung.
+
+## [0.1.0~alpha7] – unveröffentlicht
 
 ### Hinzugefügt
 - `autostart`: Das Panel startet unter seiner Überwachung
