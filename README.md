@@ -11,9 +11,9 @@ Anleitung auf <https://querencialinux.org>.
 launcher, the labwc configuration of the session and the Wayland session file
 for login screens. Alpha software; documentation is in German.
 
-> **Alpha (0.1.0~alpha7, Tag `session/0.1.0-alpha7`).** Geprüft mit
-> `tests/run.sh`; als Debian-Paket `querencia-session` Teil von Alpha 1 und
-> Alpha 2. Keine Sicherheits- oder Datenverlustgarantie.
+> **Alpha (0.1.0~alpha7-3, Tag `session/alpha7-3`; das Panel startet unter seiner
+> Überwachung).** Geprüft mit `tests/run.sh`; als Debian-Paket `querencia-session`
+> Teil von Alpha 1, Alpha 2 und Alpha 2.1. Keine Sicherheits- oder Datenverlustgarantie.
 
 ## Was installiert wird
 
