@@ -7,9 +7,14 @@ die Wayland-Sitzungsdatei für Anmeldebildschirme.
 Installiert wird es zusammen mit Querencia Desktop aus der APT-Quelle;
 Anleitung auf <https://querencialinux.org>.
 
-> **Status: Alpha (0.1.0~alpha10).** Auf der Entwicklungs-VM läuft noch der
-> Entwicklungsstarter (`herkunft/`). Der portable Stand hier ist mit
-> `tests/run.sh` geprüft, aber **noch nicht in einer echten Anmeldung**.
+*English summary:* Session start of Querencia Desktop: the `querencia-session`
+launcher, the labwc configuration of the session and the Wayland session file
+for login screens. Alpha software; documentation is in German.
+
+> **Alpha (0.1.0~alpha10, Tag `session/alpha10`; bei zink auf NVK
+> Software-OpenGL für die Programme der Sitzung).** Geprüft mit `tests/run.sh`;
+> als Debian-Paket `querencia-session` Teil von Alpha 1 bis Alpha 3. Keine
+> Sicherheits- oder Datenverlustgarantie.
 
 ## Was installiert wird
 
@@ -69,7 +74,8 @@ Einstellung `~/.config/querencia/grafik.ini`, Diagnose
 `systemd` (`loginctl`), `dbus-user-session`; für die Renderer-Prüfung
 `querencia-sitzung` ab 0.1.8 oder `mesa-utils` (`eglinfo`), sonst bleibt
 OpenGL unverändert. Ubuntu 26.04 liefert labwc
-0.9.3 – siehe `docs/TROUBLESHOOTING.md` im Repository `querencia`.
+0.9.3; die APT-Quelle von Querencia liefert labwc 0.9.8 mit (Paketierung in
+`querencia-packaging`).
 
 ## Bauen, testen, installieren
 
