@@ -92,20 +92,33 @@ touch "$T/portal-answers"
 for p in panel desktop sitzung polkit benach einst; do
     printf '#!/bin/sh\necho "%s $*" >>"$FAKE/autostart.txt"\necho "%s ${GDK_DEBUG-}" >>"$FAKE/gdk.txt"\n' "$p" "$p" >"$A/$p"; chmod 755 "$A/$p"
 done
+# The autostart asks the panel for its capabilities (--faehigkeiten); the
+# fake answers without recording. Like Panel 0.2.3 it names "ueberwacht",
+# so the panel starts under its watchdog; with $FAKE/panel-alt it acts as an
+# older panel without the capability.
+printf '#!/bin/sh\nif [ "${1-}" = --faehigkeiten ]; then [ -e "$FAKE/panel-alt" ] || echo ueberwacht; exit 0; fi\necho "panel $*" >>"$FAKE/autostart.txt"\necho "panel ${GDK_DEBUG-}" >>"$FAKE/gdk.txt"\n' >"$A/panel"; chmod 755 "$A/panel"
 run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
     QUERENCIA_DESKTOP="$A/desktop" QUERENCIA_DESKTOP_RECORD="$A/state/desktop.pid" \
     QUERENCIA_SITZUNG="$A/sitzung" QUERENCIA_LEERLAUF_MINUTEN=7 QUERENCIA_POLKIT_AGENT="$A/polkit" \
     QUERENCIA_BENACHRICHTIGUNGEN="$A/benach" QUERENCIA_EINSTELLUNGEN="$A/einst" sh "$ROOT/labwc/autostart"
 sleep 0.5
 got=$(sort "$T/autostart.txt" 2>/dev/null | tr '\n' '|')
-[ "$got" = "benach |desktop |einst --bildschirm-anwenden|panel |polkit |sitzung --leerlauf 7|" ] && ok "autostart startet alle sechs" || nok "autostart startet alle sechs" "$got"
+[ "$got" = "benach |desktop |einst --bildschirm-anwenden|panel --ueberwacht|polkit |sitzung --leerlauf 7|" ] && ok "autostart startet alle sechs, Panel unter Überwachung" || nok "autostart startet alle sechs" "$got"
 [ -s "$A/state/panel.pid" ] && [ -s "$A/state/desktop.pid" ] && ok "autostart schreibt Panel- und Desktop-Eintrag" || nok "autostart Einträge"
 rm -f "$T/autostart.txt"
 run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
     QUERENCIA_DESKTOP= QUERENCIA_SITZUNG= QUERENCIA_POLKIT_AGENT= QUERENCIA_BENACHRICHTIGUNGEN= QUERENCIA_EINSTELLUNGEN= sh "$ROOT/labwc/autostart"
 sleep 0.5
 got=$(cat "$T/autostart.txt" 2>/dev/null | tr '\n' '|')
-[ "$got" = "panel |" ] && ok "autostart ohne optionale Programme: nur Panel" || nok "autostart ohne optionale Programme" "$got"
+[ "$got" = "panel --ueberwacht|" ] && ok "autostart ohne optionale Programme: nur Panel" || nok "autostart ohne optionale Programme" "$got"
+# an older panel without the capability starts as before, without --ueberwacht
+rm -f "$T/autostart.txt" "$A/state/panel.pid"; touch "$T/panel-alt"
+run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
+    QUERENCIA_DESKTOP= QUERENCIA_SITZUNG= QUERENCIA_POLKIT_AGENT= QUERENCIA_BENACHRICHTIGUNGEN= QUERENCIA_EINSTELLUNGEN= sh "$ROOT/labwc/autostart"
+sleep 0.5
+got=$(cat "$T/autostart.txt" 2>/dev/null | tr '\n' '|')
+[ "$got" = "panel |" ] && [ -s "$A/state/panel.pid" ] && ok "autostart: älteres Panel ohne Überwachung" || nok "autostart: älteres Panel" "$got"
+rm -f "$T/panel-alt" "$T/autostart.txt"
 case $(cat "$A/state/sitzung-start.log" 2>/dev/null) in *"Settings-Portal antwortet nach"*) ok "autostart: Portal-Wächter, Portal antwortet" ;; *) nok "autostart: Portal antwortet" ;; esac
 [ -z "$(grep -v ' $' "$T/gdk.txt")" ] && ok "autostart: ohne no-portals, wenn das Portal antwortet" || nok "autostart: GDK_DEBUG" "$(cat "$T/gdk.txt")"
 # 3c portal does not answer: GTK programs without the portal, portals
