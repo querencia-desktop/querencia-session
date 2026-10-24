@@ -4,9 +4,9 @@
 # always wins.
 [Default Applications]
 # Folders with Querencia Dateien (application ID org.querencia.Dateien). The
-# starters of Querencia Files (org.querencia.Files.desktop and the old
-# io.github.lgse.Strata.desktop) are hidden bridges to Querencia Dateien
-# without MIME types for one release.
+# transition of the starters of Querencia Files (org.querencia.Files.desktop
+# and the old io.github.lgse.Strata.desktop) is up to the packages
+# querencia-files and querencia-dateien.
 inode/directory=org.querencia.Dateien.desktop
 # Texte und Bilder wie auf der Entwicklungs-VM (Editor 0.2.0, Bilder 0.1.1);
 # fehlt ein Programm, nimmt GIO das nächste passende.

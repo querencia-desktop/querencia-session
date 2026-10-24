@@ -52,10 +52,39 @@ printf '#!/bin/sh\nexit 0\n' >"$T/bin/querencia-desktop"
 chmod 755 "$T/bin/"*
 cp "$ROOT/labwc/environment" "$ROOT/labwc/autostart" "$ROOT/labwc/rc.xml" "$T/etc/querencia/labwc/"
 echo 0.9.8 >"$T/labwc-version"
+# Fake renderer probe (software OpenGL, QD-169): eglinfo reports the renderer
+# from $T/renderer, or hangs with $T/egl-haengt (its PID goes to
+# $T/haenger.pids, the tests end it themselves). Render nodes come from a
+# fake /sys/class/drm (QUERENCIA_DRM_SYSFS); by default none, so no test
+# ever asks the real graphics driver.
+cat >"$T/bin/eglinfo" <<'X'
+#!/bin/sh
+echo "$*" >>"$FAKE/eglinfo.log"
+if [ -e "$FAKE/egl-haengt" ]; then echo $$ >>"$FAKE/haenger.pids"; exec sleep 30; fi
+[ -r "$FAKE/renderer" ] || { echo "eglinfo: kein Gerät" >&2; exit 1; }
+echo "EGL client extensions string:"
+echo "OpenGL ES profile renderer: $(cat "$FAKE/renderer")"
+X
+chmod 755 "$T/bin/eglinfo"
+mkdir -p "$T/drm-leer"
+# Fake DRM class directory with one render node per kernel driver $@; prints
+# its path.
+drm() {
+    d=$T/drm-$(echo "$*" | tr ' ' '-')
+    rm -rf "$d"; mkdir -p "$d"; n=128
+    for treiber in "$@"; do
+        mkdir -p "$T/treiber/$treiber" "$d/renderD$n/device"
+        ln -s "$T/treiber/$treiber" "$d/renderD$n/device/driver"
+        n=$((n + 1))
+    done
+    echo "$d"
+}
+SW="LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe GALLIUM_DRIVER=llvmpipe"
+ZINK="zink Vulkan 1.4(NVIDIA GeForce RTX 3060 (NVK GA106) (MESA_NVK))"
 
 run() { # env -i with the fake system; extra VAR=value arguments first
     env -i HOME="$T/home" PATH="$T/bin:/usr/bin:/bin" FAKE="$T" \
-        QUERENCIA_SYSCONFDIR="$T/etc" QUERENCIA_BINDIR="$T/bin" "$@"
+        QUERENCIA_SYSCONFDIR="$T/etc" QUERENCIA_BINDIR="$T/bin" QUERENCIA_DRM_SYSFS="$T/drm-leer" "$@"
 }
 S="$ROOT/bin/querencia-session"
 
@@ -66,7 +95,7 @@ done
 
 # 2 version
 out=$(run sh "$S" --version)
-[ "$out" = "querencia-session 0.1.0~alpha9" ] && ok "--version" || nok "--version" "$out"
+[ "$out" = "querencia-session 0.1.0~alpha10" ] && ok "--version" || nok "--version" "$out"
 
 # 3 --check finds labwc, configuration, panel and desktop
 out=$(run sh "$S" --check); rc=$?
@@ -135,6 +164,23 @@ got=$(sort "$T/gdk.txt" 2>/dev/null | tr '\n' '|')
 case $(cat "$A/state/sitzung-start.log" 2>/dev/null) in *"antwortet nicht in 1,5 s"*) ok "autostart: Meldung ohne Portal" ;; *) nok "autostart: Meldung ohne Portal" ;; esac
 grep -q 'stop xdg-desktop-portal-gtk.service xdg-desktop-portal.service' "$T/systemctl.log" 2>/dev/null && ok "autostart: Portal wird neu angestoßen" || nok "autostart: Portal-Stopp"
 rm -f "$T/bin/querencia-sitzung" "$T/bin/querencia-polkit-agent" "$T/bin/querencia-benachrichtigungen" "$T/bin/querencia-einstellungen"
+# 3d software OpenGL: autostart exports exactly the three names from
+# QUERENCIA_GRAFIK_UMGEBUNG to what it starts, nothing else
+touch "$T/portal-answers"
+printf '#!/bin/sh\n[ "${1-}" = --faehigkeiten ] && exit 0\nenv | grep -E "^(LIBGL_|MESA_|GALLIUM_|VK_|FREMD=)" | sort >"$FAKE/panel-env"\n' >"$A/panel"; chmod 755 "$A/panel"
+rm -f "$T/panel-env"
+run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
+    QUERENCIA_GRAFIK_UMGEBUNG="$SW FREMD=1 VK_ICD_FILENAMES=x" sh "$ROOT/labwc/autostart"
+sleep 0.5
+got=$(tr '\n' ' ' <"$T/panel-env" 2>/dev/null)
+[ "$got" = "GALLIUM_DRIVER=llvmpipe LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe " ] &&
+    ok "autostart: Software-OpenGL genau die drei Namen an das Panel" || nok "autostart: Software-OpenGL" "$got"
+rm -f "$T/panel-env"
+run QUERENCIA_PANEL="$A/panel" QUERENCIA_STATE_DIR="$A/state" QUERENCIA_PANEL_RECORD="$A/state/panel.pid" \
+    QUERENCIA_GRAFIK_UMGEBUNG= sh "$ROOT/labwc/autostart"
+sleep 0.5
+[ -f "$T/panel-env" ] && [ ! -s "$T/panel-env" ] && ok "autostart: ohne QUERENCIA_GRAFIK_UMGEBUNG nichts gesetzt" || nok "autostart: leer" "$(cat "$T/panel-env" 2>/dev/null)"
+rm -f "$T/portal-answers" "$T/panel-env"
 
 # 4 labwc versions
 for v in 0.9.4:0 0.9.8:0 0.9.10:0 0.10.0:0 1.0:0 0.9.4-dev:0 0.9.3:1 0.8.4:1 0.9:1; do
@@ -173,7 +219,7 @@ rm -f "$T/home/.config/querencia/session.conf"
 U=$T/home/.config/querencia/labwc
 out=$(run sh "$S" --labwc-konfig-abgleichen 2>&1); rc=$?
 [ "$rc" = 0 ] && cmp -s "$U/rc.xml" "$T/etc/querencia/labwc/rc.xml" && cmp -s "$U/.vorgabe/autostart" "$T/etc/querencia/labwc/autostart" &&
-    grep -q "querencia-session 0.1.0~alpha9" "$U/.vorgabe/stand" && ok "Abgleich legt Benutzerkopie und .vorgabe an" || nok "Abgleich anlegen" "rc=$rc $out"
+    grep -q "querencia-session 0.1.0~alpha10" "$U/.vorgabe/stand" && ok "Abgleich legt Benutzerkopie und .vorgabe an" || nok "Abgleich anlegen" "rc=$rc $out"
 echo '# eigene Zeile' >>"$U/rc.xml"
 cp "$T/etc/querencia/labwc/environment" "$T/env.orig"
 echo 'NEU=1' >>"$T/etc/querencia/labwc/environment"
@@ -293,6 +339,143 @@ grep -q 'set-environment LANG=C.UTF-8' "$T/systemctl.log" && grep -q 'unset-envi
 [ -f "$T/home/.config/querencia/labwc/.vorgabe/stand" ] && ok "Start: Benutzerkopie abgeglichen" || nok "Start: Benutzerkopie"
 [ ! -e "$T/home/.local/state/querencia/aktivierungsumgebung.vorher" ] && ok "Start: Sicherung der Aktivierungsumgebung aufgeräumt" || nok "Start: Sicherung"
 rm -f "$T/portal-active"
+
+# 14 software OpenGL (QD-169): decision with --grafik-pruefen, which starts
+# and changes nothing; fake render nodes, fake eglinfo and querencia-sitzung
+grafik() { # sysfs, then extra VAR=value arguments
+    sysfs=$1; shift
+    rm -f "$T/eglinfo.log"
+    run QUERENCIA_DRM_SYSFS="$sysfs" "$@" sh "$S" --grafik-pruefen 2>&1
+}
+echo "$ZINK" >"$T/renderer"
+out=$(grafik "$(drm nouveau)")
+case $out in *"Grafik: Software-OpenGL für die Sitzung: $SW (zink auf NVK/nouveau; Renderer „$ZINK“ (Kerneltreiber nouveau, Prüfung "*" ms über eglinfo -B -p surfaceless, gewartet "*) ok "Grafik: zink auf NVK, nouveau -> Software-OpenGL" ;;
+*) nok "Grafik: zink auf NVK" "$out" ;; esac
+grep -qx -- '-B -p surfaceless -a gles' "$T/eglinfo.log" 2>/dev/null && ok "Grafik: eglinfo surfaceless GLES gefragt" || nok "Grafik: eglinfo-Aufruf" "$(cat "$T/eglinfo.log" 2>/dev/null)"
+for treiber in amdgpu i915 nvidia; do
+    out=$(grafik "$(drm $treiber)")
+    case $out in *"Grafik: OpenGL unverändert (Kerneltreiber $treiber, kein nouveau: nicht geprüft)") ;;
+    *) nok "Grafik: $treiber" "$out"; continue ;; esac
+    [ ! -e "$T/eglinfo.log" ] && ok "Grafik: $treiber -> nichts, nicht geprüft" || nok "Grafik: $treiber geprüft"
+done
+out=$(grafik "$T/drm-leer")
+case $out in *"(Kerneltreiber keiner, kein nouveau: nicht geprüft)") ok "Grafik: kein Render-Knoten -> nichts" ;; *) nok "Grafik: kein Render-Knoten" "$out" ;; esac
+for r in "NV106" "llvmpipe (LLVM 20.1.8, 256 bits)"; do
+    echo "$r" >"$T/renderer"
+    out=$(grafik "$(drm nouveau)")
+    case $out in *"Grafik: OpenGL unverändert (kein zink auf NVK/nouveau; Renderer „$r“"*) ok "Grafik: nouveau mit $r -> nichts" ;; *) nok "Grafik: $r" "$out" ;; esac
+done
+echo "AMD Radeon RX 6600 (radeonsi, navi23, LLVM 20.1.8, DRM 3.64)" >"$T/renderer"
+out=$(grafik "$(drm amdgpu nouveau)")
+case $out in *"OpenGL unverändert (kein zink auf NVK/nouveau; Renderer „AMD Radeon"*"(Kerneltreiber amdgpu nouveau, Prüfung"*) ok "Grafik: zwei Karten, radeonsi -> geprüft, nichts" ;; *) nok "Grafik: zwei Karten" "$out" ;; esac
+rm -f "$T/renderer"
+out=$(grafik "$(drm nouveau)")
+case $out in *"OpenGL unverändert (Renderer unbekannt (Prüfung ohne Ergebnis nach "*"eglinfo: kein Gerät"*) ok "Grafik: Prüfung scheitert -> nichts" ;; *) nok "Grafik: Prüfung scheitert" "$out" ;; esac
+# querencia-sitzung --grafik-pruefen first (Querencia Sitzung 0.1.8); an
+# older one without the option leaves it to eglinfo
+printf '#!/bin/sh\n[ "${1-}" = --grafik-pruefen ] || exit 2\n[ -e "$FAKE/sitzung-alt" ] && { echo "unbekannte Option: $1" >&2; exit 2; }\nprintf "renderer=%%s\\nvendor=Mesa\\n" "$(cat "$FAKE/sitzung-renderer")"\n' >"$T/bin/querencia-sitzung"
+chmod 755 "$T/bin/querencia-sitzung"
+echo "$ZINK" >"$T/sitzung-renderer"
+out=$(grafik "$(drm nouveau)")
+case $out in *"Software-OpenGL für die Sitzung: $SW (zink auf NVK/nouveau;"*"über querencia-sitzung --grafik-pruefen"*) ;; *) nok "Grafik: über querencia-sitzung" "$out" ;; esac
+[ ! -e "$T/eglinfo.log" ] && ok "Grafik: querencia-sitzung --grafik-pruefen zuerst, kein eglinfo" || nok "Grafik: eglinfo trotz querencia-sitzung"
+touch "$T/sitzung-alt"; echo "$ZINK" >"$T/renderer"
+out=$(grafik "$(drm nouveau)")
+case $out in *"Software-OpenGL für die Sitzung: $SW"*"über eglinfo -B -p surfaceless"*) ok "Grafik: ältere querencia-sitzung -> eglinfo" ;; *) nok "Grafik: ältere querencia-sitzung" "$out" ;; esac
+rm -f "$T/bin/querencia-sitzung" "$T/sitzung-alt" "$T/sitzung-renderer"
+# a probe that hangs: at most 2 s, then nothing; the hanging process is
+# not waited for
+touch "$T/egl-haengt"; rm -f "$T/haenger.pids"
+t0=$(date +%s%N)
+out=$(grafik "$(drm nouveau)")
+ms=$((($(date +%s%N) - t0) / 1000000))
+case $out in *"OpenGL unverändert (Renderer unbekannt (Prüfung ohne Ergebnis in 2000 ms (Zeitgrenze), gewartet "*) ;; *) nok "Grafik: Hänger" "$out" ;; esac
+[ "$ms" -ge 1900 ] && [ "$ms" -lt 3500 ] && ok "Grafik: Prüfung hängt -> Zeitgrenze 2 s, nichts ($ms ms)" || nok "Grafik: Hänger Dauer" "$ms ms"
+haenger=$(cat "$T/haenger.pids" 2>/dev/null)
+[ -n "$haenger" ] && kill -0 $haenger 2>/dev/null && ok "Grafik: hängende Prüfung läuft noch, Starter wartete nicht darauf" || nok "Grafik: Hänger-Prozess" "$haenger"
+[ -z "$haenger" ] || kill $haenger 2>/dev/null
+rm -f "$T/egl-haengt" "$T/haenger.pids"
+# grafik.ini: an, aus, unknown value, key in another section
+mkdir -p "$T/home/.config/querencia"; GI=$T/home/.config/querencia/grafik.ini
+printf '[Grafik]\nSoftware-OpenGL = An\n' >"$GI"
+out=$(grafik "$(drm amdgpu)")
+case $out in *"Software-OpenGL für die Sitzung: $SW (Software-OpenGL=an in $GI)") [ ! -e "$T/eglinfo.log" ] && ok "Grafik: grafik.ini an (Großschreibung) -> Software-OpenGL ohne Prüfung" || nok "Grafik: an geprüft" ;;
+*) nok "Grafik: grafik.ini an" "$out" ;; esac
+printf '# Kommentar\n[Grafik]\nSoftware-OpenGL=aus\n' >"$GI"
+out=$(grafik "$(drm nouveau)")
+case $out in *"OpenGL unverändert (Software-OpenGL=aus in $GI)") [ ! -e "$T/eglinfo.log" ] && ok "Grafik: grafik.ini aus -> nichts, nicht geprüft" || nok "Grafik: aus geprüft" ;;
+*) nok "Grafik: grafik.ini aus" "$out" ;; esac
+printf '[Grafik]\nSoftware-OpenGL = vielleicht\n' >"$GI"
+out=$(grafik "$(drm nouveau)")
+case $out in *"Software-OpenGL für die Sitzung: $SW (zink auf NVK/nouveau;"*"; unbekannter Wert „vielleicht“ in $GI, gilt automatisch") ok "Grafik: unbekannter Wert -> automatisch mit Hinweis" ;; *) nok "Grafik: unbekannter Wert" "$out" ;; esac
+printf '[Anderes]\nSoftware-OpenGL = an\n' >"$GI"
+out=$(grafik "$(drm amdgpu)")
+case $out in *"OpenGL unverändert (Kerneltreiber amdgpu, kein nouveau: nicht geprüft)") ok "Grafik: Schlüssel außerhalb von [Grafik] zählt nicht" ;; *) nok "Grafik: anderer Abschnitt" "$out" ;; esac
+rm -f "$GI"
+
+# 15 whole starts with software OpenGL: the fake labwc runs the autostart
+# file of its configuration like labwc does and records its own
+# environment; the fake panel records what it gets
+cat >"$T/bin/labwc" <<'X'
+#!/bin/sh
+[ "${1-}" = --version ] && { echo "labwc $(cat "$FAKE/labwc-version") (+xwayland +nls +rsvg +libsfdo)"; exit 0; }
+echo "fake labwc started: $*" >>"$FAKE/started"
+env | grep -E "^(LIBGL_|MESA_|GALLIUM_|VK_|QUERENCIA_GRAFIK_UMGEBUNG=)" | sort >"$FAKE/labwc-env"
+sh "$2/autostart" </dev/null >/dev/null 2>&1
+for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e "$FAKE/panel-env" ] && break; sleep 0.1; done
+exit 0
+X
+cp "$T/bin/querencia-panel" "$T/panel.orig"
+printf '#!/bin/sh\n[ "${1-}" = --faehigkeiten ] && exit 0\nenv | grep -E "^(LIBGL_|MESA_|GALLIUM_|VK_)" | sort >"$FAKE/panel-env"\n' >"$T/bin/querencia-panel"
+chmod 755 "$T/bin/labwc" "$T/bin/querencia-panel"
+touch "$T/portal-answers"
+start() { # sysfs; runs a whole start, sets rc and ms
+    rm -f "$T/started" "$T/systemctl.log" "$T/dbus-env.log" "$T/labwc-env" "$T/panel-env" "$T/eglinfo.log" "$SL"
+    t0=$(date +%s%N)
+    run QUERENCIA_DRM_SYSFS="$1" XDG_RUNTIME_DIR="$T/run" XDG_SESSION_ID=7 LANG=de_DE.UTF-8 sh "$S" >"$T/start.out" 2>&1; rc=$?
+    ms=$((($(date +%s%N) - t0) / 1000000))
+}
+echo "$ZINK" >"$T/renderer"
+start "$(drm nouveau)"
+[ "$rc" = 0 ] && [ -e "$T/started" ] && [ "$(cat "$T/labwc-env" 2>/dev/null)" = "QUERENCIA_GRAFIK_UMGEBUNG=$SW" ] &&
+    ok "Start zink: labwc ohne die drei Variablen, nur QUERENCIA_GRAFIK_UMGEBUNG" || nok "Start zink: labwc" "rc=$rc $(cat "$T/labwc-env" "$T/start.out" 2>/dev/null)"
+got=$(tr '\n' ' ' <"$T/panel-env" 2>/dev/null)
+[ "$got" = "GALLIUM_DRIVER=llvmpipe LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe " ] &&
+    ok "Start zink: Panel (Autostart) mit den drei Variablen, ohne VK_*" || nok "Start zink: Panel" "$got"
+grep 'set-environment LANG=' "$T/systemctl.log" | grep -q " $SW\$" && grep -q " $SW\$" "$T/dbus-env.log" &&
+    ok "Start zink: Software-OpenGL in der Aktivierungsumgebung (systemd, D-Bus)" || nok "Start zink: Aktivierung" "$(cat "$T/systemctl.log" "$T/dbus-env.log" 2>/dev/null)"
+grep -q 'unset-environment .*LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE GALLIUM_DRIVER' "$T/systemctl.log" &&
+    ok "Start zink: nach dem Ende aus der Aktivierungsumgebung entfernt" || nok "Start zink: Rücknahme" "$(cat "$T/systemctl.log")"
+grep -q "Grafik: Software-OpenGL für die Sitzung: $SW (zink auf NVK/nouveau;" "$SL" && ! grep -q 'übernimmt QUERENCIA_GRAFIK_UMGEBUNG nicht' "$SL" &&
+    ok "Start zink: Protokollzeile in sitzung-start.log" || nok "Start zink: Protokoll" "$(grep Grafik "$SL")"
+order=$(grep -o -e 'Grafik: ' -e 'Aktivierungsumgebung gesetzt' -e 'starte ' "$SL" | tr '\n' '|')
+[ "$order" = "Grafik: |Aktivierungsumgebung gesetzt|starte |" ] && ok "Start zink: Entscheidung vor Aktivierung und labwc" || nok "Start zink: Reihenfolge" "$order"
+[ -z "$(ls "$T/home/.local/state/querencia" | grep grafik-pruefung)" ] && ok "Start zink: keine Prüfdateien übrig" || nok "Start zink: Prüfdateien" "$(ls "$T/home/.local/state/querencia")"
+# another driver: nothing anywhere, no probe
+start "$(drm amdgpu)"
+[ "$rc" = 0 ] && [ "$(cat "$T/labwc-env" 2>/dev/null)" = "QUERENCIA_GRAFIK_UMGEBUNG=" ] && [ -f "$T/panel-env" ] && [ ! -s "$T/panel-env" ] &&
+    ! grep -q -e LIBGL_ -e MESA_LOADER -e GALLIUM_ "$T/systemctl.log" "$T/dbus-env.log" && [ ! -e "$T/eglinfo.log" ] &&
+    grep -q 'Grafik: OpenGL unverändert (Kerneltreiber amdgpu, kein nouveau: nicht geprüft)' "$SL" &&
+    ok "Start amdgpu: nichts gesetzt, nicht geprüft, Protokollzeile" || nok "Start amdgpu" "rc=$rc $(cat "$T/labwc-env" "$T/panel-env" "$T/systemctl.log" 2>/dev/null)"
+# a hanging probe: nothing set, the start goes on after at most 2 s
+touch "$T/egl-haengt"; rm -f "$T/haenger.pids"
+start "$(drm nouveau)"
+haenger=$(cat "$T/haenger.pids" 2>/dev/null)
+gewartet=$(sed -n 's/.*Zeitgrenze), gewartet \([0-9]*\) ms.*/\1/p' "$SL")
+[ "$rc" = 0 ] && [ -e "$T/started" ] && [ -n "$gewartet" ] && [ "$gewartet" -le 2100 ] && [ -f "$T/panel-env" ] && [ ! -s "$T/panel-env" ] &&
+    ! grep -q LIBGL_ "$T/systemctl.log" && ok "Start Hänger: Zeitgrenze, nichts gesetzt, labwc gestartet (gewartet $gewartet ms, Start $ms ms)" ||
+    nok "Start Hänger" "rc=$rc gewartet=$gewartet $(grep Grafik "$SL")"
+[ -n "$haenger" ] && kill -0 $haenger 2>/dev/null && ok "Start Hänger: Starter beendet, hängende Prüfung läuft noch" || nok "Start Hänger: Prozess" "$haenger"
+[ -z "$haenger" ] || kill $haenger 2>/dev/null
+rm -f "$T/egl-haengt" "$T/haenger.pids"
+# an own autostart without the block: a note, software OpenGL only for
+# activation
+printf '# eigene autostart\n' >"$T/home/.config/querencia/labwc/autostart"
+start "$(drm nouveau)"
+grep -q 'autostart übernimmt QUERENCIA_GRAFIK_UMGEBUNG nicht (eigene Datei?)' "$SL" && grep 'set-environment LANG=' "$T/systemctl.log" | grep -q " $SW\$" &&
+    ok "Start mit eigener autostart: Hinweis, Software-OpenGL nur über die Aktivierung" || nok "Start eigene autostart" "$(grep Grafik "$SL")"
+rm -rf "$T/home/.config/querencia/labwc" "$T/renderer" "$T/portal-answers"
+cp "$T/panel.orig" "$T/bin/querencia-panel"
 
 echo "Ergebnis: $pass bestanden, $fail fehlgeschlagen"
 [ "$fail" -eq 0 ]

@@ -18,6 +18,14 @@ labwc: Aktivierungsumgebung, Portal-Reset vor und nach labwc, Rücknahme,
 fünf Log-Generationen. `systemctl`, `busctl`, `loginctl` und
 `dbus-update-activation-environment` sind dabei Attrappen, die nur
 mitschreiben; der echte User-Manager wird nie angesprochen.
+Seit 0.1.0~alpha10 außerdem Software-OpenGL (QD-169): gefälschte
+Render-Knoten (`QUERENCIA_DRM_SYSFS`), `eglinfo` und `querencia-sitzung`
+als Attrappen; zink auf NVK, andere Treiber ohne Prüfung, zwei Karten,
+gescheiterte und hängende Prüfung (Zeitgrenze 2 s), `grafik.ini`, der
+Export im autostart und ganze Starts (labwc ohne, Panel mit den drei
+Variablen, Aktivierungsumgebung und Rücknahme, eigene autostart). Der
+echte Grafiktreiber wird dabei nie gefragt; das tut nur
+`querencia-session --grafik-pruefen` von Hand.
 
 Nicht abgedeckt (braucht eine echte Anmeldung, siehe `docs/TESTING.md` im
 Repository `querencia`): Start des echten labwc, Panel und Desktop,

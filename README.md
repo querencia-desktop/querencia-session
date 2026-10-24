@@ -4,7 +4,7 @@ Sitzungsstart von [Querencia Desktop](../querencia/README.md): der Starter
 `querencia-session`, die labwc-Konfiguration der Sitzung und die
 Wayland-Sitzungsdatei für Anmeldebildschirme.
 
-> **Status: Alpha (0.1.0~alpha9).** Auf der Entwicklungs-VM läuft noch der
+> **Status: Alpha (0.1.0~alpha10).** Auf der Entwicklungs-VM läuft noch der
 > Entwicklungsstarter (`herkunft/`). Der portable Stand hier ist mit
 > `tests/run.sh` geprüft, aber **noch nicht in einer echten Anmeldung**.
 
@@ -34,8 +34,10 @@ liegt dann als `<datei>.vorgabe-neu` daneben). Mit der Datei
 Anmeldebildschirm / Konsole
   └─ querencia-session            beendet Reste einer früheren Sitzung; prüft: keine andere
      │                            Sitzung, logind-Sitz, labwc ≥ 0.9.4, Vorgabe, querencia-panel;
+     │                            prüft bei nouveau im Hintergrund den OpenGL-Renderer;
      │                            setzt Tastatur/Sprache, gleicht die Benutzerkopie ab, gibt
-     │                            Sprache und Desktop an systemd/D-Bus, stoppt die Portale
+     │                            Sprache und Desktop (bei zink auf NVK Software-OpenGL) an
+     │                            systemd/D-Bus, stoppt die Portale
      └─ labwc -C ~/.config/querencia/labwc   (alter Weg: /etc/querencia/labwc)
         └─ autostart  ─ wartet höchstens 1,5 s auf das Settings-Portal
                       ─ querencia-polkit-agent         Passwortdialog für polkit (optional)
@@ -52,10 +54,18 @@ Nach dem Ende von labwc stoppt der Starter die Portale wieder und setzt die
 Aktivierungsumgebung zurück, damit eine sofortige Neuanmeldung frische
 Portale bekommt (QD-062).
 
+Mit dem freien NVIDIA-Treiber (nouveau, OpenGL als zink auf NVK) bekommen
+die Programme der Sitzung Software-OpenGL (llvmpipe), labwc selbst nicht;
+Einstellung `~/.config/querencia/grafik.ini`, Diagnose
+`querencia-session --grafik-pruefen`. Siehe
+[docs/sitzung-grafik.md](docs/sitzung-grafik.md).
+
 ## Abhängigkeiten
 
 `labwc (>= 0.9.4)`, `querencia-shell`, `procps` (`pgrep`, `ps`),
-`systemd` (`loginctl`), `dbus-user-session`. Ubuntu 26.04 liefert labwc
+`systemd` (`loginctl`), `dbus-user-session`; für die Renderer-Prüfung
+`querencia-sitzung` ab 0.1.8 oder `mesa-utils` (`eglinfo`), sonst bleibt
+OpenGL unverändert. Ubuntu 26.04 liefert labwc
 0.9.3 – siehe `docs/TROUBLESHOOTING.md` im Repository `querencia`.
 
 ## Bauen, testen, installieren
